@@ -1,0 +1,857 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Imóvel ideal · Metrocasa</title>
+<link rel="icon" id="fav">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+/* paleta Metrocasa (mesma do padrão executivo): vermelho = ação/1º lugar, vinho = estrutura,
+   verde = único estado positivo. Nada decorativo. */
+:root{
+ --vinho:#5C0A10;--vermelho:#D3141C;--vermelho-d:#A80F16;--marca:#EC1C24;
+ --rosa:#F8E8E9;--rosa-linha:#EFD2D4;
+ --tinta:#1A1416;--grafite:#6B6065;--neutro:#EDE9EA;--papel:#FFFFFF;
+ --ok:#1F7A5C;--ok-bg:#E6F2EC;--alerta:#9A5B00;
+ --disp:'Space Grotesk',system-ui,sans-serif;
+ --txt:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+html{font-size:clamp(16px,min(1.15vw,2.05vh),22px)}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:var(--txt);font-size:1rem;line-height:1.5;color:var(--tinta);background:var(--papel);-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--vermelho);outline-offset:2px}
+.logo{height:1.375rem;width:auto;display:block}
+.btn{border:0;border-radius:0.375rem;padding:0.8125rem 1.375rem;font-weight:600;font-size:0.9375rem;cursor:pointer;background:var(--vermelho);color:#fff;transition:background .15s}
+.btn:hover:not(:disabled){background:var(--vermelho-d)}
+.btn:disabled{background:var(--neutro);color:var(--grafite);cursor:not-allowed}
+.btn-ghost{border:0;background:none;padding:0.8125rem 0.375rem;font-weight:600;font-size:0.9375rem;color:var(--grafite);cursor:pointer}
+.btn-ghost:hover{color:var(--tinta)}
+.btn-line{border:1.5px solid var(--rosa-linha);background:#fff;border-radius:0.375rem;padding:0.625rem 1rem;font-weight:600;font-size:0.875rem;cursor:pointer}
+.btn-line:hover{border-color:var(--vinho)}
+
+/* ===== login ===== */
+.gate{min-height:100%;display:none;align-items:center;justify-content:center;padding:1.5rem 1rem;background:var(--rosa)}
+.gate form{background:#fff;border-radius:0.625rem;padding:2.25rem 2rem;width:100%;max-width:25rem}
+.gate h1{font-family:var(--disp);font-weight:600;font-size:1.75rem;letter-spacing:-.02em;line-height:1.15;margin:1.75rem 0 0.375rem}
+.gate p{color:var(--grafite);margin:0 0 1.375rem;font-size:0.9375rem}
+.gate label{display:block;font-size:0.875rem;font-weight:500;margin:0.875rem 0 0.375rem}
+.gate input{width:100%;height:2.875rem;border:1.5px solid var(--neutro);border-radius:0.375rem;padding:0 0.75rem}
+.gate input:focus{outline:none;border-color:var(--vinho)}
+.gate .btn{width:100%;margin-top:1.5rem}
+.gate-err{color:var(--vermelho-d);font-size:0.875rem;margin-top:0.75rem;min-height:1.2em}
+
+/* ===== quiz ===== */
+#quiz{position:fixed;inset:0;display:none;grid-template-columns:minmax(0,1fr) minmax(20rem,38%);background:var(--papel)}
+#quiz.on{display:grid}
+.q-main{display:flex;flex-direction:column;min-height:0;min-width:0}
+.q-top{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1.5rem 3rem 0}
+.q-count{font-size:0.875rem;color:var(--grafite)}
+.q-count b{font-family:var(--disp);font-weight:600;color:var(--tinta)}
+.q-track{display:none}
+.q-body{flex:1;min-height:0;overflow-y:auto;padding:3rem 3rem 1.5rem}
+.q-inner{max-width:45rem}
+.q-title{font-family:var(--disp);font-weight:600;font-size:clamp(1.625rem,3.2vw,2.375rem);line-height:1.12;letter-spacing:-.02em;margin:0;max-width:22ch;outline:none}
+.q-hint{color:var(--grafite);margin:0.625rem 0 1.75rem;font-size:0.9375rem;max-width:60ch}
+.q-hint b{color:var(--tinta);font-weight:600}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:0.625rem}
+.opts.one{grid-template-columns:1fr;max-width:32.5rem}
+.opts.tri{grid-template-columns:repeat(3,1fr)}
+.opts.tri .opt{padding:0.625rem 2.25rem 0.625rem 0.625rem}
+.opt{position:relative;display:flex;gap:0.875rem;align-items:center;text-align:left;background:#fff;border:1.5px solid var(--neutro);border-radius:0.5rem;padding:0.875rem 2.5rem 0.875rem 0.875rem;cursor:pointer;transition:border-color .12s,background .12s}
+/* ícone ilustrado: duotone em círculo pastel (fundo e traço do mesmo matiz) */
+.ico{flex:none;width:2.875rem;height:2.875rem;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5625rem;background:var(--pb);color:var(--pc)}
+.opts.tri .ico{width:2.375rem;height:2.375rem;font-size:1.3125rem}
+.opt.sel .ico{box-shadow:0 0 0 2px #fff,0 0 0 0.2188rem var(--pc)}
+.opt:hover{border-color:var(--rosa-linha)}
+.opt.sel{border-color:var(--vermelho);background:var(--rosa)}
+.opt.off{opacity:.4;pointer-events:none}
+.opt .mk{position:absolute;top:0.75rem;right:0.75rem;width:1.125rem;height:1.125rem;border:1.5px solid #BDB4B7;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center}
+.opt.multi .mk{border-radius:0.25rem}
+.opt.sel .mk{border-color:var(--vermelho);background:var(--vermelho)}
+.opt.sel .mk::after{content:'';width:0.375rem;height:0.375rem;border-radius:50%;background:#fff}
+.opt.multi.sel .mk::after{width:0.5625rem;height:0.3125rem;border-radius:0;background:none;border:2px solid #fff;border-top:0;border-right:0;transform:translateY(-1px) rotate(-45deg)}
+.opt .ot{display:block;font-weight:600;font-size:1rem;line-height:1.3}
+.opt .od{display:block;color:var(--grafite);font-size:0.875rem;line-height:1.4;margin-top:0.1875rem}
+.money{max-width:32.5rem}
+.money input{width:100%;height:4.25rem;border:1.5px solid var(--neutro);border-radius:0.5rem;padding:0 1.125rem;font-family:var(--disp);font-weight:600;font-size:2rem;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.money input:focus{outline:none;border-color:var(--vermelho)}
+.chips{display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.875rem}
+.chips button{border:1.5px solid var(--neutro);background:#fff;border-radius:0.375rem;padding:0.5rem 0.875rem;font-weight:600;font-size:0.875rem;cursor:pointer;font-variant-numeric:tabular-nums}
+.chips button:hover{border-color:var(--rosa-linha)}
+.q-dica{display:flex;gap:0.625rem;align-items:flex-start;margin:1.375rem 0 0;padding:0.75rem 0.875rem;border-radius:0.5rem;background:#F4F7F5;border:1px dashed #BFD6C8;font-size:0.875rem;color:#2F4A3C;max-width:40rem}
+.q-dica i{font-size:1.375rem;color:#2A7F55;flex:none}
+.q-dica b{font-weight:600}
+.q-top .right{display:flex;align-items:center;gap:1rem}
+.rot{border:0;background:none;font-size:0.8125rem;color:var(--grafite);cursor:pointer;display:flex;align-items:center;gap:0.375rem;padding:0.25rem 0}
+.rot .sw{width:1.75rem;height:1rem;border-radius:0.5625rem;background:#CFC7CA;position:relative;transition:background .15s}
+.rot .sw::after{content:'';position:absolute;top:2px;left:2px;width:0.75rem;height:0.75rem;border-radius:50%;background:#fff;transition:transform .15s}
+.rot[aria-pressed="true"] .sw{background:#2A7F55}
+.rot[aria-pressed="true"] .sw::after{transform:translateX(0.75rem)}
+.chips .zero{border-style:dashed}
+.chips .zero[aria-pressed="true"]{border-style:solid;border-color:var(--vermelho);background:var(--rosa)}
+.q-foot{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 3rem 1.5rem;border-top:1px solid var(--neutro)}
+.q-foot .note{font-size:0.8125rem;color:var(--grafite);max-width:40ch}
+
+/* prédio que sobe um andar por resposta */
+.q-side{background:var(--rosa);display:flex;flex-direction:column;justify-content:flex-end;padding:2rem 1.75rem 0;min-height:0;overflow:hidden}
+.q-side svg{width:100%;height:auto;max-height:100%;display:block}
+.fl-rise{animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
+@keyframes rise{from{transform:translateY(-18px);opacity:0}to{transform:none;opacity:1}}
+.q-load{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(20rem,38%)}
+.q-load .msg{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:3rem}
+.q-load h2{font-family:var(--disp);font-weight:600;font-size:clamp(1.625rem,3vw,2.25rem);letter-spacing:-.02em;line-height:1.15;margin:0 0 0.625rem;max-width:20ch}
+.q-load p{color:var(--grafite);margin:0}
+.bar-ind{height:0.1875rem;background:var(--neutro);margin-top:1.75rem;width:100%;max-width:20rem;overflow:hidden;border-radius:2px}
+.bar-ind i{display:block;height:100%;width:40%;background:var(--vermelho);animation:ind 1.1s ease-in-out infinite}
+@keyframes ind{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+
+/* ===== resultado ===== */
+#result{display:none}
+#result.on{display:block}
+.r-wrap{max-width:85rem;margin:0 auto;padding:1.5rem 1.5rem 4.5rem}
+.r-top{display:flex;align-items:center;justify-content:space-between;gap:0.75rem;margin-bottom:2.75rem}
+.r-top .acts{display:flex;gap:0.5rem}
+.r-h1{font-family:var(--disp);font-weight:600;font-size:clamp(1.75rem,4vw,2.75rem);line-height:1.08;letter-spacing:-.025em;margin:0;max-width:20ch}
+.r-lead{color:var(--grafite);margin:0.875rem 0 0;font-size:1rem;max-width:72ch}
+.perfil{display:grid;grid-template-columns:repeat(auto-fit,minmax(9.375rem,1fr));gap:1rem 1.75rem;margin:2rem 0 0;padding:1.25rem 0;border-top:1px solid var(--rosa-linha)}
+.perfil dt{font-size:0.8125rem;color:var(--grafite)}
+.perfil dd{margin:2px 0 0;font-weight:600;font-size:0.9375rem}
+/* poder de compra: faixa vinho, a única área de cor sólida do resultado */
+.poder{background:var(--vinho);color:#fff;border-radius:0.625rem;padding:1.375rem 1.5rem;display:grid;grid-template-columns:minmax(0,1.9fr) repeat(3,minmax(0,1fr));gap:1.125rem 1.75rem;align-items:end}
+.poder h2{font-family:var(--disp);font-weight:600;font-size:0.9375rem;margin:0 0 0.375rem;opacity:.8}
+.poder .big{font-family:var(--disp);font-weight:700;font-size:clamp(1.5rem,2.6vw,2rem);letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
+.poder .big span{white-space:nowrap}
+.poder .big small{font-size:0.9375rem;font-weight:600;opacity:.8;margin:0 0.25rem}
+.poder dt{font-size:0.8125rem;opacity:.75}
+.poder dd{margin:2px 0 0;font-family:var(--disp);font-weight:600;font-size:1.125rem;font-variant-numeric:tabular-nums}
+.poder p{grid-column:1/-1;margin:0;font-size:0.8125rem;opacity:.8;max-width:90ch}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(22.5rem,42%);gap:2rem;margin-top:1.75rem;align-items:start}
+.mapbox{position:sticky;top:1rem;height:calc(100vh - 2rem);min-height:26.25rem;border-radius:0.625rem;overflow:hidden;background:var(--neutro)}
+#map{position:absolute;inset:0}
+.mapnote{position:absolute;left:0.625rem;bottom:0.625rem;z-index:500;background:#fff;border-radius:0.375rem;padding:0.375rem 0.625rem;font-size:0.75rem;color:var(--grafite);box-shadow:0 1px 0.25rem rgba(26,20,22,.15);max-width:calc(100% - 1.25rem)}
+.leaflet-container{font-family:var(--txt)}
+.leaflet-popup-content{margin:0.75rem 0.875rem;font-size:0.8125rem;line-height:1.45}
+.leaflet-popup-content b{font-family:var(--disp);font-size:0.9375rem;display:block;margin-bottom:2px}
+.pin-tip{font-family:var(--disp);font-weight:600;font-size:0.75rem}
+.filtro{display:flex;flex-wrap:wrap;gap:0.375rem;margin:0 0 0.375rem}
+.filtro button{border:1.5px solid var(--neutro);background:#fff;border-radius:0.375rem;padding:0.4375rem 0.75rem;font-size:0.875rem;font-weight:500;cursor:pointer}
+.filtro button[aria-pressed="true"]{border-color:var(--vinho);background:var(--vinho);color:#fff}
+.filtro .n{font-family:var(--disp);font-variant-numeric:tabular-nums;opacity:.7;margin-left:0.25rem}
+.listnote{font-size:0.8125rem;color:var(--grafite);margin:0.625rem 0 0.25rem}
+.rank{list-style:none;margin:0;padding:0}
+.row{display:grid;grid-template-columns:2.25rem minmax(0,1fr) 5.75rem;grid-template-areas:"pos name pct" "pos meta pct" "pos buy buy" "pos pitch pitch" "pos why why";gap:2px 1rem;padding:1rem 0.5rem 1rem 0;border-bottom:1px solid var(--neutro);align-items:center;cursor:pointer;transition:background .12s}
+.row:hover,.row.on{background:#FCF6F6}
+.pos{grid-area:pos;align-self:start;width:1.875rem;height:1.875rem;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--disp);font-weight:600;font-size:0.875rem;border:1.5px solid var(--neutro);color:var(--grafite);font-variant-numeric:tabular-nums;margin-left:0.25rem}
+.row:nth-child(1) .pos{background:var(--vermelho);border-color:var(--vermelho);color:#fff}
+.row:nth-child(2) .pos,.row:nth-child(3) .pos{background:var(--vinho);border-color:var(--vinho);color:#fff}
+.name{grid-area:name;font-family:var(--disp);font-weight:600;font-size:1.125rem;letter-spacing:-.01em;line-height:1.2}
+.meta{grid-area:meta;color:var(--grafite);font-size:0.875rem}
+.buy{grid-area:buy;display:flex;flex-wrap:wrap;align-items:baseline;gap:0.25rem 0.75rem;margin-top:0.375rem}
+.buy .price{font-family:var(--disp);font-weight:600;font-size:1.0625rem;font-variant-numeric:tabular-nums}
+.buy .fit{font-size:0.8125rem;font-weight:600}
+.fit.ok{color:var(--ok)} .fit.lim{color:var(--alerta)} .fit.no{color:var(--vermelho-d)}
+.pct{grid-area:pct;text-align:right}
+.pct .v{font-family:var(--disp);font-weight:700;font-size:1.375rem;line-height:1;font-variant-numeric:tabular-nums}
+.pct .v small{font-size:0.8125rem;font-weight:600;margin-left:1px}
+.pct .t{height:0.25rem;background:var(--neutro);border-radius:2px;margin-top:0.5rem;overflow:hidden}
+.pct .t i{display:block;height:100%;margin-left:auto}
+.hi .v{color:var(--ok)} .hi .t i{background:var(--ok)}
+.md .v{color:var(--vinho)} .md .t i{background:var(--vinho)}
+.lo .v{color:var(--grafite)} .lo .t i{background:#B9AFB2}
+.why{grid-area:why;display:flex;flex-wrap:wrap;gap:2px 0.875rem;margin-top:0.375rem;font-size:0.8125rem}
+.why span{color:var(--grafite)}
+.why .ok{color:var(--ok)}
+.why .ok::before{content:'✓ ';font-weight:700}
+/* 3 escolhas */
+.picks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0.875rem;margin:2rem 0 1.75rem}
+.pick{position:relative;text-align:left;background:#fff;border:1.5px solid var(--neutro);border-radius:0.625rem;padding:1.125rem 1.125rem 1rem;cursor:pointer;display:flex;flex-direction:column;gap:0.375rem;transition:border-color .12s}
+.pick:hover{border-color:var(--rosa-linha)}
+.pick.rec{border:2px solid var(--vermelho)}
+.pick .lab{display:flex;align-items:center;gap:0.5rem;font-weight:600;font-size:0.875rem}
+.pick .lab .ico{width:2.125rem;height:2.125rem;font-size:1.1875rem}
+.pick .nm{font-family:var(--disp);font-weight:600;font-size:1.25rem;letter-spacing:-.01em;line-height:1.2;margin-top:0.375rem}
+.pick .mt{font-size:0.875rem;color:var(--grafite)}
+.pick .pr{display:flex;align-items:baseline;justify-content:space-between;gap:0.625rem;margin-top:0.375rem}
+.pick .pr b{font-family:var(--disp);font-weight:600;font-size:1.25rem;font-variant-numeric:tabular-nums}
+.pick .pr span{font-family:var(--disp);font-weight:700;font-size:1.125rem}
+.pick .dl{font-size:0.8125rem;color:var(--vinho);font-weight:600}
+.pitch{grid-area:pitch;display:flex;flex-direction:column;gap:0.1875rem;margin-top:0.5rem}
+.pitch span{display:flex;gap:0.4375rem;align-items:flex-start;font-size:0.875rem;color:var(--vinho);font-weight:500;line-height:1.35}
+.pitch i{font-size:1.0625rem;flex:none;margin-top:1px}
+.pick .pitch{margin-top:0.25rem}
+.poder .cmp{grid-column:1/-1;background:rgba(255,255,255,.1);border-radius:0.5rem;padding:0.75rem 0.875rem;font-size:0.9375rem;line-height:1.5}
+.poder .cmp b{font-family:var(--disp);font-weight:600}
+.btn-wa{border:0;background:#1F7A5C;color:#fff;border-radius:0.375rem;padding:0.625rem 1rem;font-weight:600;font-size:0.875rem;cursor:pointer;display:flex;align-items:center;gap:0.375rem}
+.btn-wa:hover{background:#17614A}
+.btn-wa i{font-size:1.125rem}
+@media (max-width:860px){.picks{grid-template-columns:1fr}}
+.empty{padding:2.5rem 0;color:var(--grafite);max-width:52ch}
+.empty b{display:block;color:var(--tinta);font-family:var(--disp);font-size:1.25rem;font-weight:600;margin-bottom:0.375rem}
+.metodo{margin-top:2.5rem;font-size:0.8125rem;color:var(--grafite);max-width:80ch;line-height:1.6}
+
+@media (max-width:1100px){
+ .split{grid-template-columns:1fr}
+ .mapbox{position:relative;top:0;height:21.25rem;min-height:0;order:-1}
+ .poder{grid-template-columns:1fr 1fr}
+ .poder > div:first-child{grid-column:1/-1}
+}
+@media (max-width:860px){
+ #quiz{grid-template-columns:1fr}
+ .q-side{display:none}
+ .q-top{padding:1rem 1rem 0}
+ .q-track{display:flex;gap:0.25rem;padding:0.75rem 1rem 0}
+ .q-track i{flex:1;height:0.25rem;border-radius:2px;background:var(--neutro)}
+ .q-track i.done{background:var(--vinho)}
+ .q-track i.now{background:var(--vermelho)}
+ .q-body{padding:1.75rem 1rem 1rem}
+ .opts,.opts.tri{grid-template-columns:1fr 1fr}
+ .q-foot{padding:0.75rem 1rem 1rem}
+ .q-foot .note{display:none}
+ .q-load{grid-template-columns:1fr}
+ .q-load .q-side{display:none}
+ .r-wrap{padding:1rem 1rem 3.5rem}
+ .r-top{margin-bottom:1.75rem}
+ .mapbox{height:17.5rem}
+}
+@media (max-width:520px){
+ .opts,.opts.tri{grid-template-columns:1fr}
+ .money input{font-size:1.625rem;height:3.75rem}
+ .r-top .acts .btn-line:first-child{display:none}
+ .poder{grid-template-columns:1fr}
+ .row{grid-template-columns:2.125rem minmax(0,1fr) 4.375rem;gap:2px 0.625rem}
+}
+@media (prefers-reduced-motion:reduce){
+ *,*::before,*::after{animation:none!important;transition:none!important}
+}
+
+/* ===== navegação ===== */
+.logo-btn{border:0;background:none;padding:0;cursor:pointer;display:block}
+.logo-btn:hover .logo{opacity:.8}
+/* quiz: conteúdo centralizado na vertical quando cabe */
+.q-body{display:flex;flex-direction:column}
+.q-inner{margin:auto 0;width:100%}
+.q-foot .btns{display:flex;gap:.6rem;align-items:center}
+.q-side{cursor:default}
+.fl-go{cursor:pointer}
+.fl-go:hover .fl-body,.fl-go:focus-visible .fl-body{filter:brightness(1.25)}
+.fl-go:focus{outline:none}
+.fl-go:focus-visible .fl-body{stroke:#D3141C;stroke-width:3}
+
+/* ===== resultado em 2 colunas: conteúdo rola, mapa fixo à direita ===== */
+.r-app{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,42%);min-height:100vh}
+.r-left{min-width:0;padding:1.25rem 2rem 3rem}
+.r-map{position:sticky;top:0;height:100vh;background:#C9C3C5}
+.r-map #map{position:absolute;inset:0;background:#C9C3C5}
+.r-top{margin-bottom:1.75rem}
+.r-h1{font-size:clamp(1.6rem,2.3vw,2.4rem);max-width:24ch}
+.r-lead{font-size:.95rem;margin-top:.5rem}
+.pchips{display:flex;flex-wrap:wrap;gap:.4rem;margin:1.1rem 0 0}
+.pchip{border:1px solid var(--neutro);background:#fff;border-radius:999px;padding:.3rem .75rem;font-size:.82rem;cursor:pointer;display:flex;gap:.35rem;align-items:baseline}
+.pchip span{color:var(--grafite)}
+.pchip b{font-weight:600}
+.pchip:hover{border-color:var(--vinho)}
+.picks{grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));margin:1.5rem 0 1.25rem}
+.poder{grid-template-columns:auto repeat(3,minmax(0,1fr));padding:1rem 1.25rem;gap:.6rem 1.5rem;align-items:center}
+.poder h2{font-size:.8rem;margin:0 0 .2rem}
+.poder .big{font-size:clamp(1.3rem,1.8vw,1.9rem)}
+.poder dt{font-size:.75rem}
+.poder dd{font-size:1rem}
+.poder .cmp{font-size:.88rem;padding:.6rem .8rem}
+.lista{margin-top:1.5rem}
+.row{padding:.85rem .5rem .85rem 0}
+.name{font-size:1.05rem}
+.why{font-size:.78rem}
+.metodo{margin-top:2rem;font-size:.78rem}
+.leaflet-container{background:#C9C3C5}
+@media (max-width:1100px){
+ .r-app{display:flex;flex-direction:column}
+ .r-map{position:relative;height:320px;order:-1}
+ .r-left{padding:1rem 1rem 3rem}
+ .poder{grid-template-columns:1fr 1fr}
+ .poder > div:first-child{grid-column:1/-1}
+}
+
+/* prédio: gancho da grua balança de leve; laje nova desce */
+.hook{animation:bob 2.6s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}
+.q-side{padding:1.5rem 1.25rem 0}
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate">
+ <form onsubmit="return doLogin(event)">
+  <img class="logo" id="gatelogo" alt="Metrocasa">
+  <h1>Encontre o imóvel ideal para o seu cliente</h1>
+  <p>Entre com a mesma conta do Motor de Cálculo para consultar o estoque.</p>
+  <label for="em">E-mail</label><input id="em" type="email" autocomplete="username" required>
+  <label for="pw">Senha</label><input id="pw" type="password" autocomplete="current-password" required>
+  <button class="btn" id="gatebtn">Entrar</button>
+  <div class="gate-err" id="gateerr" role="alert"></div>
+ </form>
+</div>
+
+<div id="quiz" aria-live="polite"></div>
+<div id="result"></div>
+
+<script>
+var LOGO='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAwIiBoZWlnaHQ9Ijg2IiB2aWV3Qm94PSIwIDAgNTAwIDg2IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPg0KPHBhdGggZD0iTTE1LjUgNTIuMDgwNkwyMC43NzcxIDgwLjI5MDFMNDMuMjM5MyA4NS40MjkxTDM3Ljk4OSA1Mi4yMDFMMTUuNSA1Mi4wODA2Wk05Ni4xMzE5IDUwLjU1MTNMNjQuMzU2MyAwLjE2NTQ5NkwzMy40NDYzIDBMNjUuNDE2NyA1MC4zODY4TDk2LjEzMTkgNTAuNTUxM1pNMCA1MC4wMzc2TDMyLjA0NDEgNTAuMjA4OEw0Ny42Nzg5IDI1Ljk5NDdMMzEuNzQyMSAwLjg3Nzg0NUwwIDUwLjAzNzZaTTU1LjU3MzkgODUuNDk0OEw3OC4wODk3IDgwLjU5NjZMODMuNjY3OSA1Mi40NDUyTDYxLjE3ODkgNTIuMzI0OEw1NS41NzM5IDg1LjQ5NDhaIiBmaWxsPSIjRUMxQzI0Ii8+DQo8cGF0aCBkPSJNMjY2LjMxOSAxNy45MDI3TDI2NS41MTQgMTMuODM0NEwyNTMuMTA0IDEzLjc2ODJMMjUyLjkwNiA1MC45NDUxTDI2Ni43NDQgNTEuMDE5TDI2Ni44NDcgMzEuNjc4MUMyNjYuODczIDI2Ljc4NjIgMjY5LjgxNyAyNC42OTU3IDI3My4yNzcgMjQuNzE0NEMyNzUuNjA5IDI0LjcyNjkgMjc3LjI2MSAyNS4xODY0IDI3OS41MDcgMjcuMDA0OUwyODUuMTI2IDE3LjAyNTNDMjgyLjczMyAxNC40NTQyIDI3OS4xMzIgMTMuMDA1IDI3NS4zNyAxMi45ODQ5QzI3MS43NjEgMTIuOTY1MiAyNjguMjkzIDE0LjQ1MTMgMjY2LjMxOSAxNy45MDI3Wk0xOTQuOTA0IDEyLjU1NDZDMTg0LjgyNiAxMi41MDA4IDE3NC4xODkgMTguNDYzOSAxNzQuMTE3IDMyLjAxMDZDMTc0LjA0NCA0NS41NTYyIDE4My45NDEgNTEuNDA1MiAxOTUuNjczIDUxLjQ2NzVDMjAyLjA2NiA1MS41MDE2IDIwOC4xNjkgNDkuNTAyMiAyMTIuNjI4IDQ1LjM4NjlMMjA1LjkgMzcuNzQ5N0MyMDMuNDg0IDM5LjU0MTggMjAwLjM5NCA0MC43MzA1IDE5Ni4zMzMgNDAuNzA4NEMxOTMuMzI0IDQwLjY5MjEgMTg5LjA0NSAzOS4yMzkxIDE4OC4wODUgMzUuOTIzNUwyMTQuMDMxIDM2LjA2MjFDMjE3LjI2OSAyMS40MDM1IDIwOC4wNjUgMTIuNjI0NiAxOTQuOTA0IDEyLjU1NDZaTTE4OC4yMDggMjcuMDQyOEMxODkuMTQzIDIwLjk1MjEgMjAxLjMyNSAyMS4yNDM4IDIwMS42NyAyNy4xMTQ4TDE4OC4yMDggMjcuMDQyOFpNMzk5LjEzMSAxOC41MzczQzM5Ny4xOTIgMTUuNTE2NyAzOTMuNTE1IDEzLjY5MSAzODguMjUyIDEzLjY2MjdDMzc3LjQyMSAxMy42MDQ2IDM3MC4xNTYgMjEuOTk1NSAzNzAuMDk3IDMyLjk4MjlDMzcwLjAzOSA0My44MjA3IDM3Ni4wODkgNTEuNjAzOCAzODYuOTkyIDUyLjMzOTZDMzkxLjEyNyA1Mi41ODcxIDM5Ni4wOTcgNTEuMzM0NiAzOTkuMjc1IDQ3LjczOThMMzk5Ljg1NSA1MS43MzA5TDQxMi42NDEgNTEuNzk5NUw0MTIuODM5IDE0LjYyMjVMMzk5LjgyOCAxNC41NTNMMzk5LjEzMSAxOC41MzczWk0zOTEuMjYyIDQxLjIyMzZDMzg3LjEyNSA0MS4yMDE1IDM4My44MzMgMzguMjQ5NSAzODMuODYgMzMuMDU2M0MzODMuODg4IDI3Ljg2MzYgMzg3LjIxMyAyNC44NzEyIDM5MS4zNDkgMjQuODkzM0MzOTYuMjM4IDI0LjkxOTcgMzk5LjAwNCAyOC4xNjk2IDM5OC45NzcgMzMuMTM3NEMzOTguOTU0IDM3LjUwMjEgMzk1LjkyNiA0MS4yNDg2IDM5MS4yNjIgNDEuMjIzNlpNMTU0LjM3MSAxMi40MTIxQzE0OS4yNTcgMTIuMzg0OCAxNDUuMTEyIDEzLjg2OCAxNDIuMDA4IDE3LjY4OTdDMTQwLjE0NiAxNC4yMTc3IDEzNi41NDYgMTIuNDY3NyAxMzIuNzg1IDEyLjM3MThDMTI4Ljk1MSAxMi4yNzU5IDEyNC44OCAxMy44MzU0IDEyMi41MzIgMTcuMDU4TDEyMS41NzYgMTMuMDY0NUwxMDkuOTE4IDEzLjAwMjFMMTA5LjcyIDUwLjE3OTFMMTIzLjQ4MyA1MC4yNTI1TDEyMy41OTIgMjkuODU3N0MxMjMuNjg5IDI1Ljc5NDcgMTI2LjE4IDIzLjkyNzIgMTI4LjUxMiAyMy45Mzk3QzEzMC45OTMgMjMuOTUzMSAxMzIuNDE1IDI1LjM4OTMgMTMyLjM5MiAyOS42Nzk3TDEzMi4yODIgNTAuMjk5OUwxNDUuODk1IDUwLjM3MjlMMTQ2LjAwNCAyOS45MDM3QzE0Ni4wMjUgMjUuODM4OCAxNDguNTE2IDI0LjI3MjEgMTUwLjg0NyAyNC4yODQ2QzE1Mi44NzggMjQuMjk1NiAxNTQuNjc1IDI1Ljg4NDggMTU0LjY1MyAyOS43OTg3TDE1NC41NDMgNTAuNDE4OUwxNjguMzgxIDUwLjQ5MjhMMTY4LjQ5MiAyOS43OTczQzE2OC41NTggMTcuNDU1NiAxNjIuNDE4IDEyLjQ1NTMgMTU0LjM3MSAxMi40MTIxWk0yNDEuMTU3IDQwLjM0NjdDMjM5LjA1MSA0MC4zMzU3IDIzNy41NTMgMzkuMzQ4IDIzNy40OTIgMzYuNzE0TDIzNy41NTcgMjQuNTIzTDI0NS45OCAyNC41NjgxTDI0Ni4wMzcgMTMuOTU1OEwyMzcuNjkgMTMuOTExMUwyMzcuNzQ3IDMuMTUwMTJMMjIzLjk3NiA0LjU4MTA2TDIyMy45MjYgMTMuODM3M0wyMTcuOTg0IDEzLjgwNTZMMjE3LjkyOCAyNC40MTc5TDIyMy44NyAyNC40NDk2TDIyMy44MDUgMzYuNjQwNkMyMjMuNTE2IDQ4LjMwMzkgMjMwLjExNyA1MS43MjU2IDIzNy40ODcgNTEuNzY0OUMyNDEuMzIyIDUxLjc4NTYgMjQ1LjAxMiA1MS4xMjc5IDI0OC4xNzkgNDkuMzM5NkwyNDUuMjI1IDM5LjA4OEMyNDQuMDk0IDM5LjgzNDkgMjQyLjUxMSA0MC4zNTM5IDI0MS4xNTcgNDAuMzQ2N1pNMzUzLjUxMiA0MC43MjA5QzM0OC4yNDggNDAuNjkyNiAzNDUuNDg0IDM3LjA2NjEgMzQ1LjUwNiAzMy4wMDI2QzM0NS41MzEgMjguMzM2MSAzNDguNDA5IDI0LjUxMjkgMzUzLjY3MyAyNC41NDEyQzM1Ni4xNTYgMjQuNTU0NyAzNTguMjU3IDI1LjM5NDEgMzYwLjA1MSAyNy4yODQ2TDM2Ny40NjUgMTkuMzQ4QzM2My41NzUgMTUuNDEzMSAzNTguMjQ1IDEzLjUwMjkgMzUyLjkwNiAxMy40NzQxQzM0Mi40NTEgMTMuNDE4IDMzMi4wNDEgMTkuMzA4MiAzMzEuOTY4IDMyLjg1NDhDMzMxLjg5NCA0Ni43NzY2IDM0Mi4wOTMgNTIuMTc1MSAzNTIuOTI0IDUyLjIzMzFDMzU4LjQ5IDUyLjI2MjkgMzYzLjg0MSA0OS45NTg5IDM2OC4zIDQ1Ljk5MzJMMzYwLjQ0OCAzNy42NzI5QzM1OC41NTcgMzkuNjk0MyAzNTYuMDY5IDQwLjczNDMgMzUzLjUxMiA0MC43MjA5Wk00ODYuOTg5IDE1LjAxOTJMNDg2LjI5MSAxOS4wMDM2QzQ4NC4zNTIgMTUuOTgzIDQ4MC42NzYgMTQuMTU3MiA0NzUuNDEyIDE0LjEyODlDNDY0LjU4MSAxNC4wNzA5IDQ1Ny4zMTcgMjIuNDYxNyA0NTcuMjU4IDMzLjQ0OTJDNDU3LjIgNDQuMjg3IDQ2My4yNSA1Mi4wNyA0NzQuMTUyIDUyLjgwNTlDNDc4LjI4OCA1My4wNTM0IDQ4My4yNTcgNTEuODAwOSA0ODYuNDM2IDQ4LjIwNjFMNDg3LjAxNiA1Mi4xOTcxTDQ5OS44MDEgNTIuMjY1N0w1MDAgMTUuMDg4OEw0ODYuOTg5IDE1LjAxOTJaTTQ3OC40MjMgNDEuNjg5OUM0NzQuMjg2IDQxLjY2NzggNDcwLjk5MyAzOC43MTU4IDQ3MS4wMjEgMzMuNTIzQzQ3MS4wNDkgMjguMzMwMyA0NzQuMzczIDI1LjMzOCA0NzguNTEgMjUuMzYwMUM0ODMuMzk5IDI1LjM4NiA0ODYuMTY0IDI4LjYzNjQgNDg2LjEzOCAzMy42MDQxQzQ4Ni4xMTUgMzcuOTY3OSA0ODMuMDg3IDQxLjcxNDggNDc4LjQyMyA0MS42ODk5Wk00MzYuNDU3IDI3Ljk5NUM0MzQuMiAyNy45MDcyIDQzMy42OCAyNi44NTEgNDMzLjY4MyAyNi4xNzM2QzQzMy42OTEgMjQuODE5IDQzNS4wNDcgMjQuMzc0MyA0MzcuMDAyIDI0LjM4NDhDNDQwLjAxMSAyNC4zMjU0IDQ0NC4yOTIgMjUuNDAyMyA0NDYuMzE2IDI2LjY5MzFMNDUyLjIyNiAxOC40NDYyQzQ0OC42MzEgMTUuNzE2NyA0NDMuMDc1IDEzLjg4MTQgNDM3LjA1OCAxMy44NDkzQzQyOC4zMzQgMTMuODAyNyA0MTkuODkzIDE2Ljk5MzIgNDE5Ljg0NSAyNS45NDg2QzQxOS43OTcgMzQuOTc5OSA0MjguNTA2IDM3Ljk2MDcgNDM1LjcyNSAzOC4yMjZDNDM4LjQzMSAzOC40NjU4IDQzOS42MyAzOS4wNzQxIDQzOS42MjQgNDAuMjc4NkM0MzkuNjE4IDQxLjQ4MjIgNDM4LjMzNiA0Mi4wNzg0IDQzNS44NTQgNDIuMDY1QzQzMi44NDcgNDEuODk4MSA0MjguMzM2IDQxLjU3MjggNDIyLjcxNiAzNy44NTU3TDQxOC4xNDkgNDcuOTE1NEM0MjIuMzQ1IDUxLjAyMzMgNDI5LjYyOSA1Mi44Njg3IDQzNi4wOTggNTIuOTAzM0M0NDUuMDQ4IDUyLjk1MTIgNDUzLjQxNCA0OS41MzM5IDQ1My40NjIgNDAuMzUzQzQ1My41MTYgMzAuNDk0MiA0NDQuMjAyIDI4LjI2MTcgNDM2LjQ1NyAyNy45OTVaTTMwNi44MDUgMTMuMjI3MUMyOTYuMDUxIDEzLjE2OTUgMjg1LjU2NiAxOC44MzM4IDI4NS40OTIgMzIuNjA1OUMyODUuNDIgNDYuMTUxNSAyOTUuOTE3IDUyLjA3NzcgMzA2LjU5NyA1Mi4xMzQ4QzMxNy4wNTEgNTIuMTkwOSAzMjcuODM3IDQ2LjM3OCAzMjcuOTEgMzIuODMyOEMzMjcuOTgzIDE5LjI4NjEgMzE3Ljc4NSAxMy4yODYxIDMwNi44MDUgMTMuMjI3MVpNMzA2LjY1NyA0MC43NzEzQzMwMS43NyA0MC43NDU0IDI5OS4wMDcgMzYuOTY3MyAyOTkuMDMgMzIuNjc4M0MyOTkuMDUzIDI4LjM4ODQgMzAxLjg1NiAyNC41NjQ3IDMwNi43NDQgMjQuNTkxMUMzMTEuNjMzIDI0LjYxNyAzMTQuMzk1IDI4LjQ3MDQgMzE0LjM3MiAzMi43NjAzQzMxNC4zNDggMzcuMjc2MiAzMTEuMzIxIDQwLjc5NjIgMzA2LjY1NyA0MC43NzEzWiIgZmlsbD0iI0VDMUMyNCIvPg0KPHBhdGggZD0iTTIzMi42NDkgNzIuMTg1NkMyMzEuODQ1IDcyLjE1NDQgMjMxLjY1OSA3MS43Nzc5IDIzMS42NjEgNzEuNTM2MUMyMzEuNjYzIDcxLjA1MzUgMjMyLjE0NyA3MC44OTUyIDIzMi44NDMgNzAuODk5MUMyMzMuOTE2IDcwLjg3ODQgMjM1LjQ0MiA3MS4yNjIyIDIzNi4xNjMgNzEuNzIxM0wyMzguMjY5IDY4Ljc4MjdDMjM2Ljk4OCA2Ny44MDk4IDIzNS4wMDggNjcuMTU2IDIzMi44NjMgNjcuMTQ0NUMyMjkuNzU0IDY3LjEyNzcgMjI2Ljc0NiA2OC4yNjQ2IDIyNi43MjkgNzEuNDU2NUMyMjYuNzEyIDc0LjY3NTIgMjI5LjgxNiA3NS43Mzc4IDIzMi4zODggNzUuODMxM0MyMzMuMzUzIDc1LjkxNjcgMjMzLjc4IDc2LjEzNCAyMzMuNzc3IDc2LjU2MjRDMjMzLjc3NSA3Ni45OTE3IDIzMy4zMTggNzcuMjA0MiAyMzIuNDM0IDc3LjE5OTRDMjMxLjM2MiA3Ny4xMzk5IDIyOS43NTQgNzcuMDIzOCAyMjcuNzUxIDc1LjY5ODlMMjI2LjEyNCA3OS4yODQyQzIyNy42MTkgODAuMzkxMyAyMzAuMjE1IDgxLjA0ODUgMjMyLjUyIDgxLjA2MUMyMzUuNzEgODEuMDc4MiAyMzguNjkxIDc5Ljg2MDggMjM4LjcwOSA3Ni41ODgzQzIzOC43MjggNzMuMDc1OSAyMzUuNDA5IDcyLjI4MDEgMjMyLjY0OSA3Mi4xODU2Wk0xOTUuOTEgNjYuOTQ2OUMxOTQuNTE2IDY2LjkxMjMgMTkyLjg1MiA2Ny4zODU4IDE5MS43MTkgNjguNjkzOUwxOTEuNTEzIDY3LjI0NDhMMTg3LjE0NCA2Ny4yMjEyTDE4Ny4wNzMgODAuNDdMMTkxLjk1MSA4MC40OTU5TDE5MS45ODggNzMuNTIzQzE5MS45OTcgNzEuNzc5OCAxOTMuMSA3MC45ODA2IDE5NC4yOCA3MC45ODczQzE5NS4xOTEgNzAuOTkyMSAxOTYuMTI2IDcxLjU2MDYgMTk2LjExOCA3My4xOTYzTDE5Ni4wNzggODAuNTE4NEwyMDEuMDEgODAuNTQ0OEwyMDEuMDQ5IDczLjE5NjhDMjAxLjA3NCA2OC40NzU3IDE5OC42OTcgNjYuOTg4NiAxOTUuOTEgNjYuOTQ2OVpNMTU0LjEwNSA2Ni43NTAyQzE1MC4yNzIgNjYuNzI5NiAxNDYuNTM2IDY4Ljc0NzYgMTQ2LjUxIDczLjY1NTRDMTQ2LjQ4NCA3OC40ODI2IDE1MC4yMjUgODAuNTk1MiAxNTQuMDMxIDgwLjYxNTNDMTU3Ljc1NyA4MC42MzU1IDE2MS42IDc4LjU2MzIgMTYxLjYyNiA3My43MzZDMTYxLjY1MiA2OC45MDg4IDE1OC4wMTggNjYuNzcwOCAxNTQuMTA1IDY2Ljc1MDJaTTE1NC4wNTIgNzYuNTY1MkMxNTIuMzEgNzYuNTU2MSAxNTEuMzI2IDc1LjIwOTYgMTUxLjMzNCA3My42ODEzQzE1MS4zNDIgNzIuMTUzIDE1Mi4zNDEgNzAuNzkwMiAxNTQuMDgzIDcwLjc5OTNDMTU1LjgyNSA3MC44MDg0IDE1Ni44MDkgNzIuMTgxOCAxNTYuODAxIDczLjcxMDFDMTU2Ljc5MyA3NS4zMiAxNTUuNzE0IDc2LjU3NDQgMTU0LjA1MiA3Ni41NjUyWk0xMTcuMjg2IDc2LjI2MTZDMTE1LjQxIDc2LjI1MTUgMTE0LjQyNiA3NC45NTkyIDExNC40MzMgNzMuNTExQzExNC40NDMgNzEuODQ3OSAxMTUuNDY4IDcwLjQ4NjEgMTE3LjM0NCA3MC40OTYxQzExOC4yMjkgNzAuNTAwOSAxMTguOTc4IDcwLjc5OTMgMTE5LjYxNyA3MS40NzMzTDEyMi4yNTkgNjguNjQ1QzEyMC44NzMgNjcuMjQzMyAxMTguOTczIDY2LjU2MjYgMTE3LjA3MSA2Ni41NTI1QzExMy4zNDUgNjYuNTMyNCAxMDkuNjM1IDY4LjYzMTYgMTA5LjYwOSA3My40NTg3QzEwOS41ODMgNzguNDE5OCAxMTMuMjE4IDgwLjM0MzggMTE3LjA3NyA4MC4zNjQ0QzExOS4wNjEgODAuMzc1IDEyMC45NjggNzkuNTUzOCAxMjIuNTU3IDc4LjE0MUwxMTkuNzU4IDc1LjE3NTZDMTE5LjA4NCA3NS44OTYxIDExOC4xOTggNzYuMjY2NCAxMTcuMjg2IDc2LjI2MTZaTTI3MS40NTMgNzcuMTY2M0MyNzAuNzAzIDc3LjE2MjUgMjcwLjE2OSA3Ni44MTA5IDI3MC4xNDYgNzUuODcyMUwyNzAuMTY5IDcxLjUyNzVMMjczLjE3MSA3MS41NDMzTDI3My4xOTIgNjcuNzYyM0wyNzAuMjE2IDY3Ljc0NjVMMjcwLjIzNyA2My45MTEzTDI2NS4zMjkgNjQuNDIxN0wyNjUuMzExIDY3LjcyMDZMMjYzLjE5NCA2Ny43MDkxTDI2My4xNzQgNzEuNDkwMUwyNjUuMjkxIDcxLjUwMTZMMjY1LjI2OCA3NS44NDYyQzI2NS4xNjYgODAuMDAzMiAyNjcuNTE4IDgxLjIyMjYgMjcwLjE0NSA4MS4yMzY1QzI3MS41MTEgODEuMjQzNyAyNzIuODI2IDgxLjAwODcgMjczLjk1NSA4MC4zNzEyTDI3Mi45MDIgNzYuNzE4M0MyNzIuNDk5IDc2Ljk4NDUgMjcxLjkzNiA3Ny4xNjg3IDI3MS40NTMgNzcuMTY2M1pNNDk1LjA3NiA2OC44NjhMNDk0LjgyNyA3MC4yODg5QzQ5NC4xMzcgNjkuMjEyNSA0OTIuODI3IDY4LjU2MTUgNDkwLjk1MSA2OC41NTE5QzQ4Ny4wOTEgNjguNTMxMyA0ODQuNTAyIDcxLjUyMTIgNDg0LjQ4MSA3NS40MzY1QzQ4NC40NjEgNzkuMjk4NiA0ODYuNjE3IDgyLjA3MjYgNDkwLjUwMiA4Mi4zMzQ2QzQ5MS45NzUgODIuNDIzMyA0OTMuNzQ2IDgxLjk3NjcgNDk0Ljg3OSA4MC42OTU0TDQ5NS4wODYgODIuMTE3N0w0OTkuNjQyIDgyLjE0MjJMNDk5LjcxMyA2OC44OTM1TDQ5NS4wNzYgNjguODY4Wk00OTIuMDI0IDc4LjM3MjdDNDkwLjU1IDc4LjM2NTEgNDg5LjM3NiA3Ny4zMTI2IDQ4OS4zODYgNzUuNDYxOUM0ODkuMzk2IDczLjYxMTMgNDkwLjU4MSA3Mi41NDQ5IDQ5Mi4wNTUgNzIuNTUyNkM0OTMuNzk3IDcyLjU2MTcgNDk0Ljc4MyA3My43MjExIDQ5NC43NzQgNzUuNDkwN0M0OTQuNzY2IDc3LjA0NjQgNDkzLjY4NiA3OC4zODE0IDQ5Mi4wMjQgNzguMzcyN1pNNDU0LjMzNiA3MC4wOTg1TDQ1NC4wNDkgNjguNjQ4OEw0NDkuNjI3IDY4LjYyNTNMNDQ5LjU1NiA4MS44NzRMNDU0LjQ4NyA4MS45MDA0TDQ1NC41MjQgNzUuMDA3N0M0NTQuNTM0IDczLjI2NDUgNDU1LjU4MyA3Mi41MTkgNDU2LjgxNSA3Mi41MjU3QzQ1Ny42NDcgNzIuNTMgNDU4LjIzNiA3Mi42OTQ2IDQ1OS4wMzYgNzMuMzQyMkw0NjEuMDM4IDY5Ljc4NTdDNDYwLjE4NiA2OC44Njk1IDQ1OC45MDIgNjguMzUyOCA0NTcuNTYyIDY4LjM0NTdDNDU2LjI3NiA2OC4zMzg5IDQ1NS4wMzkgNjguODY5IDQ1NC4zMzYgNzAuMDk4NVpNNDE2LjU4OCA2OC4xNTM4QzQxMi43NTUgNjguMTMzMSA0MDkuMDE5IDcwLjE1MTIgNDA4Ljk5MyA3NS4wNTlDNDA4Ljk2NyA3OS44ODYyIDQxMi43MDggODEuOTk4OCA0MTYuNTE0IDgyLjAxODlDNDIwLjI0IDgyLjAzOTEgNDI0LjA4MyA3OS45NjY4IDQyNC4xMDkgNzUuMTM5NkM0MjQuMTM1IDcwLjMxMjkgNDIwLjUwMSA2OC4xNzQ5IDQxNi41ODggNjguMTUzOFpNNDE2LjUzNSA3Ny45Njg4QzQxNC43OTMgNzcuOTU5NyA0MTMuODA5IDc2LjYxMzIgNDEzLjgxNyA3NS4wODQ5QzQxMy44MjUgNzMuNTU2NiA0MTQuODI0IDcyLjE5MzggNDE2LjU2NiA3Mi4yMDI5QzQxOC4zMDggNzIuMjEyIDQxOS4yOTMgNzMuNTg1NCA0MTkuMjg1IDc1LjExMzdDNDE5LjI3NyA3Ni43MjM1IDQxOC4xOTcgNzcuOTc4IDQxNi41MzUgNzcuOTY4OFpNMzgyLjI4OCA3Ny43NTg3QzM4MS41MzggNzcuNzU0OSAzODEuMDA0IDc3LjQwMzMgMzgwLjk4MiA3Ni40NjQ1TDM4MS4wMDUgNzIuMTE5OUwzODQuMDA2IDcyLjEzNTdMMzg0LjAyNiA2OC4zNTQ4TDM4MS4wNTIgNjguMzM4OUwzODEuMDcyIDY0LjUwMzhMMzc2LjE2NSA2NS4wMTQyTDM3Ni4xNDcgNjguMzEzTDM3NC4wMyA2OC4zMDE1TDM3NC4wMDkgNzIuMDgyNUwzNzYuMTI3IDcyLjA5NEwzNzYuMTA0IDc2LjQzODZDMzc2LjAwMiA4MC41OTU3IDM3OC4zNTQgODEuODE1IDM4MC45OCA4MS44MjlDMzgyLjM0NyA4MS44MzYyIDM4My42NjIgODEuNjAxMSAzODQuNzkxIDgwLjk2MzZMMzgzLjczOCA3Ny4zMTA3QzM4My4zMzQgNzcuNTc3NCAzODIuNzcxIDc3Ljc2MTYgMzgyLjI4OCA3Ny43NTg3Wk0zNDMuODQ2IDc1LjExMzJDMzQzLjgzNyA3Ni44NTY0IDM0Mi43MzQgNzcuNTc0NSAzNDEuNTU1IDc3LjU2ODNDMzQwLjY0NCA3Ny41NjM1IDMzOS43MDkgNzYuOTk1MSAzMzkuNzE3IDc1LjM1OTNMMzM5Ljc1NyA2OC4wMzcyTDMzNC44MjUgNjguMDEwOEwzMzQuNzg2IDc1LjM1OThDMzM0Ljc2IDgwLjA3OTUgMzM3LjEzOCA4MS41Njc1IDMzOS45MjUgODEuNjA5N0MzNDEuMzE4IDgxLjY0MzMgMzQyLjk4MyA4MS4xNjk5IDM0NC4xMTUgNzkuODYxN0wzNDQuMzIyIDgxLjMxMDlMMzQ4LjY5MSA4MS4zMzQ0TDM0OC43NjIgNjguMDg1N0wzNDMuODg0IDY4LjA1OThMMzQzLjg0NiA3NS4xMTMyWk0zMDMuNzMzIDY5LjI5MzFMMzAzLjQ0NiA2Ny44NDM0TDI5OS4wMjQgNjcuODE5OUwyOTguOTUzIDgxLjA2ODZMMzAzLjg4NCA4MS4wOTVMMzAzLjkyMSA3NC4yMDIzQzMwMy45MyA3Mi40NTkgMzA0Ljk4IDcxLjcxMzYgMzA2LjIxMyA3MS43MjAzQzMwNy4wNDQgNzEuNzI0NiAzMDcuNjMzIDcxLjg4OTIgMzA4LjQzNCA3Mi41MzY4TDMxMC40MzUgNjguOTgwM0MzMDkuNTgzIDY4LjA2NDEgMzA4LjI5OSA2Ny41NDc0IDMwNi45NTkgNjcuNTQwMkMzMDUuNjczIDY3LjUzMzUgMzA0LjQzNyA2OC4wNjM2IDMwMy43MzMgNjkuMjkzMVoiIGZpbGw9IiM1NzU3NTYiLz4NCjwvc3ZnPg0K'; /* logo embutido: a página não depende de arquivo ao lado */
+function g(id){return document.getElementById(id)}
+g('gatelogo').src=LOGO;g('fav').href=LOGO;
+function esc(x){return (''+(x==null?'':x)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function r2(n){return Math.round((+n||0)*100)/100}
+function brl(n){n=r2(n);return 'R$ '+n.toLocaleString('pt-BR',Number.isInteger(n)?{maximumFractionDigits:0}:{minimumFractionDigits:2,maximumFractionDigits:2})}
+function mil(n){n=+n||0;return n>=1e6?'R$ '+(n/1e6).toLocaleString('pt-BR',{maximumFractionDigits:2})+' mi':'R$ '+Math.round(n/1000).toLocaleString('pt-BR')+' mil'}
+function cur(v){v=String(v==null?'':v).replace(/[^0-9,.-]/g,'');if(!v)return 0;v=v.replace(/\./g,'').replace(',','.');var n=parseFloat(v);return isNaN(n)?0:r2(n)}
+function snorm(x){return (x||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim().toUpperCase()}
+var REDUCED=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ===== base de financiamento (mesma tabela FIN e regras padrão do Motor de Cálculo) =====
+   FIN: [renda, taxa, financ. máx, financ. máx s/ fator, parcela, subsídio s/ dependente, subsídio c/ dependente] */
+var FIN=JSON.parse('[[1500.0,4.25,92300,86500,450,16500,55000],[1600.0,4.25,98700,92500,480,16500,55000],[1700.0,4.25,105100,98600,510,16500,55000],[1800.0,4.25,111500,104600,540,16500,55000],[1900.0,4.25,118000,110600,570,16500,55000],[2000.0,4.25,124400,116700,600,15233,50777],[2100.0,4.25,130800,122700,630,13443,44812],[2160.0,4.25,134700,126300,648,12433,41444],[2160.01,4.5,130400,122400,648,12518,41729],[2200.0,4.5,132900,124800,660,11868,39562],[2300.0,4.5,139100,130600,690,10332,34440],[2400.0,4.5,145300,136400,720,8920,29735],[2500.0,4.5,151600,142300,750,7631,25438],[2600.0,4.5,157800,148100,780,6461,21538],[2700.0,4.5,164000,154000,810,5408,18026],[2800.0,4.5,170300,159800,840,4468,14893],[2850.0,4.5,173400,162800,855,4039,13465],[2850.01,4.75,162900,153100,855,4076,13334],[2900.0,4.75,165900,155900,870,3672,12008],[3000.0,4.75,172000,161600,900,2886,9818],[3100.0,4.75,178000,167300,930,2323,7582],[3200.0,4.75,184000,172900,960,1803,5880],[3200.01,5.0,178300,167800,960,1821,5947],[3300.0,5.0,184200,173300,990,0,4659],[3400.0,5.0,190000,178800,1020,0,3571],[3500.0,5.0,195900,184300,1050,0,2799],[3500.01,5.5,184300,173700,1050,0,2858],[3600.0,5.5,189800,178900,1080,0,2384],[3700.0,5.5,195300,184100,1110,0,2214],[3800.0,5.5,200800,189300,1140,0,2192],[3900.0,5.5,206300,194400,1170,0,2171],[4000.0,5.5,211800,199600,1200,0,2149],[4000.01,6.5,188600,178400,1200,0,0],[4100.0,6.5,193400,183100,1230,0,0],[4200.0,6.5,198300,187700,1260,0,0],[4300.0,6.5,203200,192300,1290,0,0],[4400.0,6.5,208100,197000,1320,0,0],[4500.0,6.5,213000,201600,1350,0,0],[4600.0,6.5,217900,206200,1380,0,0],[4700.0,6.5,220000,210900,1410,0,0],[4800.0,6.5,220000,215500,1440,0,0],[4863.0,6.5,220000,218400,1460,0,0],[4900.0,6.5,220000,220000,1468,0,0],[5000.0,6.5,220000,220000,1468,0,0],[5000.01,7.66,204600,194500,1500,0,0],[5100.0,7.66,209000,198500,1530,0,0],[5200.0,7.66,213300,202700,1560,0,0],[5300.0,7.66,217600,206800,1590,0,0],[5400.0,7.66,221900,210900,1620,0,0],[5500.0,7.66,226300,215000,1650,0,0],[5600.0,7.66,230600,219100,1680,0,0],[5700.0,7.66,234900,223300,1710,0,0],[5800.0,7.66,239200,227400,1740,0,0],[5900.0,7.66,243500,231500,1770,0,0],[6000.0,7.66,247900,235600,1800,0,0],[6100.0,7.66,252200,239700,1830,0,0],[6200.0,7.66,256500,243800,1860,0,0],[6300.0,7.66,260800,247900,1890,0,0],[6400.0,7.66,265100,252000,1920,0,0],[6500.0,7.66,269500,256100,1950,0,0],[6600.0,7.66,273800,260200,1980,0,0],[6700.0,7.66,278100,264300,2010,0,0],[6800.0,7.66,282400,268400,2040,0,0],[6900.0,7.66,286800,272500,2070,0,0],[7000.0,7.66,291100,276600,2100,0,0],[7100.0,7.66,295400,280800,2130,0,0],[7200.0,7.66,299700,284900,2160,0,0],[7300.0,7.66,304000,289000,2190,0,0],[7400.0,7.66,308400,293100,2220,0,0],[7500.0,7.66,312700,297200,2250,0,0],[7600.0,7.66,317000,301300,2280,0,0],[7700.0,7.66,320000,305400,2310,0,0],[7800.0,7.66,320000,309500,2340,0,0],[7900.0,7.66,320000,313600,2370,0,0],[8000.0,7.66,320000,317700,2400,0,0],[8100.0,7.66,320000,320000,2416,0,0],[8200.0,7.66,320000,320000,2416,0,0],[8300.0,7.66,320000,320000,2416,0,0],[8400.0,7.66,320000,320000,2416,0,0],[8500.0,7.66,320000,320000,2416,0,0],[8600.0,7.66,320000,320000,2416,0,0],[8700.0,7.66,320000,320000,2416,0,0],[8800.0,7.66,320000,320000,2416,0,0],[8900.0,7.66,320000,320000,2416,0,0],[9000.0,7.66,320000,320000,2416,0,0],[9100.0,7.66,320000,320000,2416,0,0],[9108.0,7.66,320000,320000,2416,0,0],[9200.0,7.66,320000,320000,2416,0,0],[9300.0,7.66,320000,320000,2416,0,0],[9400.0,7.66,320000,320000,2416,0,0],[9500.0,7.66,320000,320000,2416,0,0],[9600.0,7.66,320000,320000,2416,0,0],[9600.01,10.0,319000,319000,2880,0,0],[9700.0,10.0,322900,322900,2910,0,0],[9726.0,10.0,323000,323000,2917,0,0],[9800.0,10.0,326400,326400,2930,0,0],[9900.0,10.0,329800,329800,2970,0,0],[10000.0,10.0,333300,333300,3000,0,0],[10100.0,10.0,336800,336800,3030,0,0],[10200.0,10.0,340200,340200,3060,0,0],[10300.0,10.0,343700,343700,3090,0,0],[10400.0,10.0,347100,347100,3120,0,0],[10500.0,10.0,350600,350600,3150,0,0],[10600.0,10.0,354000,354000,3180,0,0],[10700.0,10.0,357500,357500,3210,0,0],[10800.0,10.0,360900,360900,3240,0,0],[10900.0,10.0,364400,364400,3270,0,0],[11000.0,10.0,367900,367900,3300,0,0],[11100.0,10.0,371300,371300,3330,0,0],[11200.0,10.0,374800,374800,3360,0,0],[11300.0,10.0,378200,378200,3390,0,0],[11400.0,10.0,381700,381700,3420,0,0],[11500.0,10.0,385100,385100,3450,0,0],[11600.0,10.0,388600,388600,3480,0,0],[11700.0,10.0,392000,392000,3510,0,0],[11800.0,10.0,395500,395500,3540,0,0],[11900.0,10.0,399000,399000,3570,0,0],[12000.0,10.0,402400,402400,3600,0,0],[12100.0,10.0,405900,405900,3630,0,0],[12200.0,10.0,409300,409300,3660,0,0],[12300.0,10.0,412800,412800,3690,0,0],[12400.0,10.0,416200,416200,3720,0,0],[12500.0,10.0,419700,419700,3750,0,0],[12600.0,10.0,423100,423100,3780,0,0],[12700.0,10.0,426600,426600,3810,0,0],[12800.0,10.0,430100,430100,3840,0,0],[12900.0,10.0,433500,433500,3870,0,0]]');
+function finLookup(renda){var row=FIN[0];for(var i=0;i<FIN.length;i++){if(FIN[i][0]<=renda)row=FIN[i];else break}return{renda:row[0],taxa:row[1],maxCom:row[2],maxSem:row[3],parcela:row[4],subS:row[5],subC:row[6]}}
+var RULES={compCorte:4500,compAbaixo:15,compAcima:20,posPctRenda:10,anuMultBase:100,
+ pos:{studio:{pct:20,meses:48},'1d':{pct:20,meses:48},'1do':{pct:20,meses:60},resto:{pct:25,meses:60}}};
+/* faixas de renda que podem comprar cada categoria (mesmo corte do assistente do Motor) */
+var ELEG={lim1:4863,lim2:9726};
+function catElegiveis(renda){
+ if(renda<=ELEG.lim1)return{'HIS-1':1,'HIS-2':1,'HMP':1,'NR':1,'R2V':1};
+ if(renda<=ELEG.lim2)return{'HIS-2':1,'HMP':1,'NR':1,'R2V':1};
+ return{'NR':1,'R2V':1}}
+
+/* ===== localização dos empreendimentos (geocodificada uma vez a partir dos endereços) ===== */
+var GEO={"PRIME SAPOPEMBA":{"lat":-23.581065,"lng":-46.526027,"prec":"rua","end":"Rua Manoel Ferreira Pires, 793 - Jd Santo Eduardo"},"ITAQUERA":{"lat":-23.532236,"lng":-46.471224,"prec":"rua","end":"Rua Iaruçú, 265, Cidade Antônio Estêvão de Carvalho"},"PENHA":{"lat":-23.526316,"lng":-46.523694,"prec":"rua","end":"Rua Otilia, 332, Penha de França"},"VILA EMA":{"lat":-23.586111,"lng":-46.540178,"prec":"rua","end":"Rua Adolfo Schnabel, 132, Vila Ema"},"IPIRANGA":{"lat":-23.602483,"lng":-46.609096,"prec":"numero","end":"Avenida Nazaré, 2075, Ipiranga"},"CANGAIBA":{"lat":-23.505334,"lng":-46.52147,"prec":"rua","end":"Avenida Cangaíba, 3720, Cangaíba"},"PATRIARCA":{"lat":-23.525202,"lng":-46.498914,"prec":"numero","end":"Rua Santo Henrique, 648, Vila Ré"},"ACLIMACAO":{"lat":-23.589272,"lng":-46.606162,"prec":"bairro","end":"Rua Mariano Procópio, 539, Ipiranga"},"VILA MATILDE":{"lat":-23.529795,"lng":-46.526365,"prec":"rua","end":"Rua Cumaí, 190, Penha de França"},"CAMPO LIMPO":{"lat":-23.643677,"lng":-46.745006,"prec":"rua","end":"Rua Fernão Vaz da Costa, 92, Jardim Sao Luiz"},"LAPA":{"lat":-23.521507,"lng":-46.698361,"prec":"rua","end":"R. Guaicurus, 821 - Água Branca"},"MORUMBI":{"lat":-23.595685,"lng":-46.729953,"prec":"rua","end":"R. Dias Viêira, 410 - Morumbi, São Paulo - SP, 05632-091 Brasil"},"ITAQUERA II":{"lat":-23.530455,"lng":-46.471317,"prec":"rua","end":"Rua Guaraxaim, 334, Cidade Antônio Estêvão de Carvalho"},"SAO MIGUEL":{"lat":-23.496709,"lng":-46.421333,"prec":"rua","end":"Rua Guaracica, 341, Vila Curuçá Velha"},"VILA PRUDENTE":{"lat":-23.577797,"lng":-46.559894,"prec":"rua","end":"R. Silvio de Sousa, 544 - Vila Santa Clara, São Paulo - SP, 03273-500"},"CONGONHAS":{"lat":-23.634973,"lng":-46.662006,"prec":"rua","end":"Rua Alsácia 280, Campo Belo, São Paulo - SP, 04630-010"},"SACOMA":{"lat":-23.628061,"lng":-46.614699,"prec":"rua","end":"R. Marquês de Lages, 1150 - Vila MoraesSão Paulo - SP, 04162-001"},"PIRITUBA":{"lat":-23.485533,"lng":-46.721939,"prec":"bairro","end":"Rua Carlos da Cunha Mattos 412, Pirituba, São Paulo - SP, 05140-040"},"VILA DAS BELEZAS":{"lat":-23.641529,"lng":-46.743966,"prec":"rua","end":"Avenida das Belezas, 605, Vila Plana"},"PARQUE SAO DOMINGOS":{"lat":-23.490168,"lng":-46.743031,"prec":"rua","end":"Rua São Francisco de Assis, 811, Vila Mangalot"},"ALTO DE PINHEIROS":{"lat":-23.532886,"lng":-46.708318,"prec":"numero","end":"Rua Camburiú, 169 e 177, Vila Ipojuca"},"MOOCA":{"lat":-23.553055,"lng":-46.591026,"prec":"numero","end":"Rua Tobias Barreto, 501, Mooca"},"PIRITUBA II":{"lat":-23.491554,"lng":-46.718153,"prec":"rua","end":"Rua Celso Vieira, 261, Vila Pereira Barreto"},"VILA SONIA":{"lat":-23.604526,"lng":-46.738848,"prec":"rua","end":"Rua Comendador Francisco Pettinati, 363, Vila Andrade"},"CASA VERDE":{"lat":-23.497698,"lng":-46.656576,"prec":"bairro","end":"Rua Domiciano Ribeiro, 165, Casa Verde Alta"},"GIOVANNI GRONCHI":{"lat":-23.640248,"lng":-46.745769,"prec":"bairro","end":"Rua Tenente Isaías Branco de Araújo, 111, Vila das Belezas"},"CENTRO":{"lat":-23.537633,"lng":-46.646281,"prec":"rua","end":"Rua Barão de Campinas, 265, Campos Elíseos São Paulo - SP, 01201-001"},"JARAGUA":{"lat":-23.486869,"lng":-46.760528,"prec":"numero","end":"Avenida Jornalista Paulo Zingg, 1031, Jardim Jaraguá"},"MORUMBI II":{"lat":-23.596573,"lng":-46.732532,"prec":"rua","end":"Rua Dias Viêira, 238, Jardim Monte Kemel São Paulo - SP, 05632-090"},"BERRINI":{"lat":-23.607451,"lng":-46.690186,"prec":"rua","end":"Rua Catipará, 303, Itaim Bibi"},"DOM BOSCO":{"lat":-23.545912,"lng":-46.454835,"prec":"rua","end":"Rua Baixada Santista, 273, Itaquera"},"SANTA CRUZ":{"lat":-23.601918,"lng":-46.629823,"prec":"rua","end":"Rua Juréia, 216 e 220, Chácara Inglesa"},"ARICANDUVA":{"lat":-23.58776,"lng":-46.496937,"prec":"rua","end":"Avenida Ouro Verde de Minas, 1949, Jardim Imperador"},"NOVE DE JULHO":{"lat":-23.554171,"lng":-46.647642,"prec":"numero","end":"R. Santo Antônio, 1080 - Bela Vista, São Paulo - SP, 01314-001"},"VILA ROMANA":{"lat":-23.522537,"lng":-46.695922,"prec":"numero","end":"Rua Guaicurus, 1053, Vila Romana"},"PAULISTA":{"lat":-23.568386,"lng":-46.649644,"prec":"rua","end":"Avenida Brigadeiro Luis Antônio, 2779, Jardim Paulista"},"VILA SONIA II":{"lat":-23.593743,"lng":-46.739905,"prec":"rua","end":"Rua Ministro Edmundo Lins, 206, Vila Sonia"},"VILA EMA II":{"lat":-23.591001,"lng":-46.541128,"prec":"numero","end":"Avenida Vila Ema, 4125, Vila Ema"},"SAUDE":{"lat":-23.625513,"lng":-46.623751,"prec":"rua","end":"Rua Calógero Calía, 593, Vila Santo Estefano"},"ITAQUERA III":{"lat":-23.542299,"lng":-46.471207,"prec":"bairro","end":"Rua Palmerino Calabrese, 206, Itaquera"},"IPIRANGA II":{"lat":-23.602542,"lng":-46.607314,"prec":"rua","end":"Rua Padre Francisco Xavier Roser nº78"},"FREGUESIA DO O":{"lat":-23.505722,"lng":-46.702246,"prec":"rua","end":"Rua Balsa, 158, Freguesia do Ó"},"ESTACAO PENHA":{"lat":-23.536995,"lng":-46.54635,"prec":"rua","end":"Rua Doutor Alarico Silveira, 586 e 604, Vila Aricanduva"},"CAMPO BELO":{"lat":-23.632618,"lng":-46.665794,"prec":"rua","end":"R. Marília de Dirceu, 274 - Jardim Aeroporto, São Paulo - SP, 04632-030"},"ESTACAO VILA SONIA":{"lat":-23.593402,"lng":-46.73056,"prec":"rua","end":"Rua Grauça, 144 e 136, Vila Sonia"},"REPUBLICA":{"lat":-23.546011,"lng":-46.646165,"prec":"numero","end":"R. Epitácio Pessoa, 137 - República, São Paulo - SP, 01220-030"},"VILA DOS REMEDIOS":{"lat":-23.512893,"lng":-46.745716,"prec":"rua","end":"R. Conselheiro Amaral, 182 - Vila Jaguara"},"AMADOR BUENO":{"lat":-23.51997,"lng":-46.516305,"prec":"rua","end":"R. Vera, 97 - Vila Granada, São Paulo - SP, 03623-000"},"PANAMBY":{"lat":-23.625687,"lng":-46.726989,"prec":"bairro","end":"Rua Alexandre Benois, 17, Vila Andrade"},"VILA PRUDENTE II":{"lat":-23.579117,"lng":-46.558856,"prec":"rua","end":"Rua Euclides Payão Silveira, 184, Vila Sta. Clara"},"JACANA":{"lat":-23.463715,"lng":-46.580568,"prec":"numero","end":"R. Irmã Emerenciana, 793 - Jaçanã"},"ESTACAO MOOCA":{"lat":-23.556267,"lng":-46.614479,"prec":"numero","end":"R. Dona Ana Néri, 236 - Mooca"},"INTERLAGOS":{"lat":-23.686232,"lng":-46.68487,"prec":"rua","end":"R. Juari, 116 - Campo Grande, São Paulo - SP, 04446-160"},"JACANA II":{"lat":-23.461879,"lng":-46.585794,"prec":"rua","end":"Av. Paulo Lincoln do Valle Pontin, 65 - Jaçanã"},"CAMBUCI":{"lat":-23.568459,"lng":-46.617824,"prec":"rua","end":"Rua Silveira Campos, 66, Cambuci"},"GUILHERMINA ESPERANCA":{"lat":-23.529094,"lng":-46.519133,"prec":"rua","end":"Rua Tapari, 155 e 139, Vila Guilhermina Esperança"},"CUPECE":{"lat":-23.661217,"lng":-46.659758,"prec":"rua","end":"R. Conde Moreira Lima, 532 - Jabaquara"},"SANTO AMARO":{"lat":-23.657646,"lng":-46.701517,"prec":"rua","end":"R. João Alfredo, 344 - Santo Amaro"},"ESTACAO PIRITUBA":{"lat":-23.489536,"lng":-46.718555,"prec":"bairro","end":"Av. Cristo Rei, 220 - Vila Pereira Barreto"},"ESTACAO SACOMA":{"lat":-23.614748,"lng":-46.593808,"prec":"rua","end":"Estrada das Lágrimas, 472, Sacomã"},"ARTUR ALVIM":{"lat":-23.541394,"lng":-46.492992,"prec":"rua","end":"Rua Henrique Jacobs, 112 - Vila Nhocuné"},"ESTACAO JOAO PAULO I":{"lat":-23.49305,"lng":-46.685448,"prec":"rua","end":"R. Benedito Guedes de Oliveira, 309 - Vila Palmeiras"},"ESTACAO VILA PRUDENTE":{"lat":-23.586118,"lng":-46.583868,"prec":"rua","end":"Rua Tome pontes, 95 e 97, Parque da Vila Prudente"},"ESTACAO LAPA":{"lat":-23.518962,"lng":-46.707242,"prec":"rua","end":"Rua Sheldon, 69 - Lapa"},"VILA DAS BELEZAS II":{"lat":-23.639605,"lng":-46.741994,"prec":"rua","end":"R. João Calixto, 34 - Vila Ernesto"},"CANGAIBA II":{"lat":-23.499457,"lng":-46.503853,"prec":"rua","end":"Rua Munhoz de Melo, 190 - Jardim Danfer"},"LIBERDADE":{"lat":-23.558065,"lng":-46.628639,"prec":"numero","end":"Rua Barao de Iguape 855  - Liberdade, São Paulo - SP"},"AVENIDA ITAQUERA":{"lat":-23.551626,"lng":-46.46469,"prec":"numero","end":"Avenida Itaquera, 6751, Cidade Líder"},"CAPAO REDONDO":{"lat":-23.673217,"lng":-46.771161,"prec":"rua","end":"R. Prof. Antônio Austregésilo, 255 - Capão Redondo"},"VILA RE":{"lat":-23.526775,"lng":-46.505113,"prec":"rua","end":"Rua Oti, 95 e 103, Vila Ré"},"ALTO DO IPIRANGA":{"lat":-23.605721,"lng":-46.613012,"prec":"rua","end":"Rua Marquesa de Santos, 139 - Vila Dom Pedro I"},"SAO JOAQUIM":{"lat":-23.559106,"lng":-46.631937,"prec":"rua","end":"Rua Mituto Mizumoto, 392, Liberdade"},"BUTANTA":{"lat":-23.576888,"lng":-46.732939,"prec":"rua","end":"Rua Tomas Gonçalves, 128, 130 e 132, Vila Gomes"},"REAL PARQUE":{"lat":-23.60686,"lng":-46.703676,"prec":"rua","end":"Rua Barão de Castro Lima, 446 - Butantã"},"VISTA CUPECE - FASE 01":{"lat":-23.681004,"lng":-46.63966,"prec":"bairro","end":"Alameda Dr. Sílvio de Campos, 148 - Jardim Miriam"},"VISTA CUPECE - FASE 02":{"lat":-23.681004,"lng":-46.63966,"prec":"bairro","end":"Alameda Dr. Sílvio de Campos, 148 - Jardim Miriam"},"JARDIM BOTANICO":{"lat":-23.63404,"lng":-46.612088,"prec":"rua","end":"R. Giovanni Di Balduccio, s/n - Cursino"},"PRACA DA ARVORE":{"lat":-23.614592,"lng":-46.629679,"prec":"rua","end":"Rua Catulo da Paixão Cearense, 538, Saúde"},"SAPOPEMBA":{"lat":-23.609123,"lng":-46.478442,"prec":"rua","end":"R. Dr. José Cioffi, 450 - São Mateus"},"TUCURUVI":{"lat":-23.467777,"lng":-46.598719,"prec":"numero","end":"R. das Gamboas, 491 - Vila Nova Mazzei"},"ESTACAO GIOVANNI GRONCHI":{"lat":-23.640248,"lng":-46.745769,"prec":"bairro","end":"Rua Bernardino Estazione, 111 - Vila das Belezas"},"CIDADE UNIVERSITARIA":{"lat":-23.57455,"lng":-46.732273,"prec":"rua","end":"Rua Monte Caseros, 167 - Vila Gomes"},"SAO MIGUEL PAULISTA":{"lat":-23.505427,"lng":-46.425896,"prec":"rua","end":"Rua Benjamin Capusso, 55 - Vila Curuçá Velha"},"VILA CLARICE":{"lat":-23.469732,"lng":-46.747891,"prec":"numero","end":"Av. Guilherme Mankel, 341 - Vila Clarice"},"JAGUARE":{"lat":-23.548324,"lng":-46.745442,"prec":"rua","end":"Av. Bolonha, 144 - Jaguaré"},"SANTANA":{"lat":-23.490064,"lng":-46.635705,"prec":"numero","end":"R. Conselheiro Moreira de Barros, 1379 - Santana"},"SACOMA II":{"lat":-23.613041,"lng":-46.597214,"prec":"rua","end":"R. Alencar Araripe, 332 - Sacomã"},"BARRA FUNDA":{"lat":-23.511536,"lng":-46.691588,"prec":"rua","end":"Rua Henrique Ongari, 381, Barra Funda"},"ESTACAO ITABERABA":{"lat":-23.485712,"lng":-46.689978,"prec":"rua","end":"R. João Delgado, 211 - Freguesia do Ó"},"AVENIDA VILA EMA":{"lat":-23.595713,"lng":-46.524984,"prec":"numero","end":"Av. Vila Ema, 6096 - Vila Ema"},"PENHA DE FRANCA":{"lat":-23.53,"lng":-46.540031,"prec":"numero","end":"R. Francisco Coimbra, 797 - Penha de França"},"PARQUE ECOLOGICO":{"lat":-23.493239,"lng":-46.505678,"prec":"rua","end":"R. São José do Ribamar, 102 - Vila Silvia"},"PENHA II":{"lat":-23.511607,"lng":-46.528745,"prec":"rua","end":"Rua Dr. Virgílio Machado, 288, Vila Pierina"},"ESTACAO ORATORIO":{"lat":-23.537704,"lng":-46.63114,"prec":"bairro","end":"R. Dona Ana Araújo de Paula, 500 - Vila Santa Clara"},"VIVA ITAQUERA":{"lat":-23.551031,"lng":-46.459618,"prec":"rua","end":"Rua Boleeiro, 20 - Itaquera"},"VIVA PENHA":{"lat":-23.535441,"lng":-46.545729,"prec":"rua","end":"Rua Gal. Sousa Neto, 266 - Penha, São Paulo - SP"},"ORATORIO":{"lat":-23.580919,"lng":-46.553838,"prec":"rua","end":"Rua Ribeirópolis, 172 - Vila Charlote"},"ESTACAO PERUS":{"lat":-23.403543,"lng":-46.751034,"prec":"rua","end":"Rua Dona Rosina, 276 - Perus, São Paulo - SP"},"PRIME VILA EMA - FASE 01":{"lat":-23.580783,"lng":-46.568059,"prec":"rua","end":"Av. Vila Ema, 4161 - Vila Prudente, São Paulo - SP"},"PRIME VILA EMA - FASE 02":{"lat":-23.580783,"lng":-46.568059,"prec":"rua","end":"Av. Vila Ema, 4161 - Vila Prudente, São Paulo - SP"},"ESTACAO VILA TOLSTOI":{"lat":-23.600114,"lng":-46.525276,"prec":"rua","end":"Rua Correia da Câmara, 422 - Vila Tolstoi"},"VILA GUILHERME":{"lat":-23.480713,"lng":-46.595821,"prec":"bairro","end":"Avenida Julio Buono, 180, Vila Gustavo"},"ESTACAO PATRIARCA":{"lat":-23.527754,"lng":-46.49932,"prec":"numero","end":"Rua São Serapião, 357"},"PARQUE NABUCO":{"lat":-23.666686,"lng":-46.660148,"prec":"rua","end":"Rua Marguerite Louise Riechelman, 116 - Vila Marari"},"VIVA PIRITUBA":{"lat":-23.497161,"lng":-46.710143,"prec":"rua","end":"R. Baltazar da Silveira, 139 - Vila Pereira Cerca"},"ESTACAO VILA DAS BELEZAS":{"lat":-23.642281,"lng":-46.743859,"prec":"rua","end":"Rua Rafael Proença, 216"},"PARQUE INDEPENDENCIA":{"lat":-23.57186,"lng":-46.613974,"prec":"rua","end":"Rua Ari Cajado, 36 - Vila Monumento"},"ERMELINO MATARAZZO":{"lat":-23.49866,"lng":-46.483876,"prec":"bairro","end":"Rua Bento Luiz, 170 - Parque Boturussu"},"CLUBE CANGAIBA":{"lat":-23.508309,"lng":-46.499384,"prec":"rua","end":"R. Dr. Saul de Camargo Neves, 180 - Vila Constanca"},"ALTO DA BOA VISTA":{"lat":-23.644139,"lng":-46.700671,"prec":"rua","end":"R. Nove de Julho, 220 - Santo Amaro"},"PRIME SAUDE":{"lat":-23.62208,"lng":-46.635207,"prec":"bairro","end":"Rua Dregoux, 27 - Parque Imperial"},"VIVA CAMPO LIMPO":{"lat":-23.628566,"lng":-46.751511,"prec":"rua","end":"Rua Gil Simões da Costa, nº 170 - Campo Limpo"},"PRIME ALTO DO IPIRANGA":{"lat":-23.606666,"lng":-46.607739,"prec":"rua","end":"Rua Capichanã, 128. Vila Nair"},"BOSQUE GIOVANNI GRONCHI":{"lat":-23.640248,"lng":-46.745769,"prec":"bairro","end":"R. Aristódemo Gazzotti, 91 - Vila das Belezas"},"CLUBE ANALIA FRANCO":{"lat":-23.570811,"lng":-46.570967,"prec":"rua","end":"Rua Tocandira, 83 - Vila Reg. Feijó"},"PRIME SANTANA":{"lat":-23.480628,"lng":-46.631276,"prec":"rua","end":"Rua Dr. Orlando Zamitti Mammana, 175 - Jardim Paraíso"},"ESTRADA DO CAMPO LIMPO":{"lat":-23.620837,"lng":-46.757693,"prec":"rua","end":"Estrada do Campo Limpo, 648 - Campo Limpo - SP"},"CLUBE GUILHERMINA":{"lat":-23.530198,"lng":-46.520568,"prec":"rua","end":"R. Rincão, 172 - Vila Esperança - São Paulo"},"ESTACAO SAPOPEMBA - MODULO I":{"lat":-23.615074,"lng":-46.49933,"prec":"rua","end":"R. Arcabuz, 183 - Jardim Adutora, São Paulo - SP, 03978-240"},"CLUBE VILA DAS BELEZAS - MODULO I":{"lat":-23.645293,"lng":-46.740944,"prec":"rua","end":"Rua Coronel Luis Schimidt, 127 - Vila das Belezas, São Paulo - SP, 05841-130"},"ESTACAO SAPOPEMBA - MODULO II":{"lat":-23.615074,"lng":-46.49933,"prec":"rua","end":"R. Arcabuz, 183 - Jardim Adutora, São Paulo - SP, 03978-240"},"CLUBE GUARAPIRANGA - MODULO I":{"lat":-23.667247,"lng":-46.715318,"prec":"rua","end":"Rua Augusto Ferreira de Morais, 259 - Bairro Socorro, São Paulo - SP"},"CLUBE GUARAPIRANGA - MODULO II":{"lat":-23.667247,"lng":-46.715318,"prec":"rua","end":"Rua Augusto Ferreira de Morais, 259 - Bairro Socorro, São Paulo - SP"},"CLUBE VILA DAS BELEZAS - MODULO II":{"lat":-23.645293,"lng":-46.740944,"prec":"rua","end":"Rua Coronel Luis Schimidt, 127 - Vila das Belezas, São Paulo - SP, 05841-130"},"ESTACAO SAPOPEMBA":{"lat":-23.615074,"lng":-46.49933,"prec":"rua","end":"R. Arcabuz, 183 - Jardim Adutora, São Paulo - SP, 03978-240"}};
+function geoOf(emp){var k=snorm(emp);return GEO[k]||GEO[k.replace(/^METROCASA\s+/,'')]||null}
+
+/* ===== roteiro — f = rótulo curto do andar no prédio lateral ===== */
+var STEPS=[
+ {k:'motivo',t:'choice',f:'Motivo',dica:'Deixe o cliente contar a história. Pergunte: há quanto tempo vocês estão pensando nisso? O que falta para decidir?',q:'O que fez você começar a procurar um imóvel agora?',hint:'Escolha a opção que mais combina com você.',o:[
+  ['Sonho da casa própria','Quero conquistar o meu lugar.'],
+  ['Quero investir','Busco renda de aluguel ou valorização.'],
+  ['Família cresceu','Preciso de mais espaço.'],
+  ['Morar perto do trabalho','Quero ganhar tempo no dia a dia.'],
+  ['Sair do aluguel','Quero pagar por algo que seja meu.'],
+  ['Trocar de imóvel','O atual já não atende o que preciso.']]},
+ {k:'composicao',t:'choice',f:'Mora com',dica:'Pergunte se pretendem aumentar a família nos próximos anos. Isso muda a planta ideal.',q:'Quem vai morar com você?',hint:'Isso define quantos cômodos fazem sentido.',o:[
+  ['Vou morar sozinho(a)','Só eu no imóvel.'],
+  ['Comprador(a) e parceiro(a)','Vou morar com meu parceiro ou parceira.'],
+  ['Família com filhos','Precisamos de quarto para as crianças.'],
+  ['Com pet','Meu pet vem junto.'],
+  ['Com familiares','Vou dividir com pais, irmãos ou parentes.']]},
+ {k:'aluguel',t:'money',f:'Aluguel',min:100,chips:[800,1000,1300,1600,2000],zero:'Não pago aluguel',q:'Quanto você paga de aluguel hoje?',hint:'Some o condomínio, se tiver. Vamos comparar com a parcela do apartamento.',
+  cond:function(){return !!ANS.motivo&&ANS.motivo!=='Quero investir'},
+  dica:'Anote o valor exato. No resultado ele vira a comparação principal: aluguel de hoje contra a parcela depois das chaves.'},
+ {k:'renda',t:'money',f:'Renda',min:500,chips:[2500,3500,4500,6000,8000],q:'Qual é a renda mensal bruta de quem vai comprar?',hint:'Se duas pessoas vão comprar juntas, some as rendas. Usamos esse valor só para estimar quanto dá para financiar e pagar.',
+  dica:'Pergunte se mais alguém pode compor renda (cônjuge, pais, irmãos). Se tiver FGTS, anote para levar ao Motor de Cálculo.'},
+ {k:'deslocamento',t:'choice',f:'Rotina',dica:'Pergunte onde fica o trabalho ou a escola dos filhos. Use a resposta para puxar a região.',q:'Como você costuma se deslocar?',hint:'Usamos isso para pesar o acesso a transporte de cada região.',o:[
+  ['Usa metrô','Pego metrô quase todo dia.'],
+  ['Usa carro','Ando de carro na maior parte do tempo.'],
+  ['Home office','Trabalho de casa.'],
+  ['Depende de ônibus','O ônibus é meu principal transporte.'],
+  ['Prefere tudo perto de casa','Resolvo tudo a pé ou de bicicleta.']]},
+ {k:'tipologia',t:'choice',f:'Planta',dica:'Na dúvida entre 1 e 2 dormitórios, mostre o 1 dorm. + office: ganha um ambiente a mais por menos.',q:'Qual planta você imagina?',hint:'É o critério que mais pesa na compatibilidade.',o:[
+  ['Studio','Ambiente integrado, prático e compacto.'],
+  ['1 dormitório','Quarto separado da sala.'],
+  ['2 dormitórios','Espaço para família, visita ou escritório.']]},
+ {k:'prioridade',t:'choice',f:'Prioridade',dica:'Repita a prioridade em voz alta. Ela vai guiar a primeira sugestão do resultado.',q:'Se só uma coisa pudesse pesar na escolha, qual seria?',hint:'Ela desempata unidades parecidas.',o:[
+  ['Melhor localização','Perto do trabalho, do metrô e de serviços.'],
+  ['Menor parcela','Caber no orçamento com folga.'],
+  ['Maior apartamento','Mais metros quadrados.'],
+  ['Melhor condomínio','Lazer completo e segurança.'],
+  ['Maior valorização','Potencial de retorno do investimento.']]},
+ {k:'lazer',t:'multi',max:5,f:'Lazer',dica:'Pergunte como é o fim de semana da família. Lazer no condomínio economiza passeio.',q:'Quais áreas de lazer não podem faltar?',hint:'Escolha até 5.',o:[
+  ['Piscina'],['Academia'],['Playground'],['Salão de festas'],['Espaço gourmet'],['Churrasqueira'],['Espaço pet'],
+  ['Quadra esportiva'],['Beach tênis'],['Sauna'],['Brinquedoteca'],['Sala de jogos'],['Coworking'],['Indiferente']]},
+ {k:'diferenciais',t:'multi',max:5,f:'Diferenciais',dica:'Portaria e espaço delivery pesam para quem trabalha fora. Energia solar reduz a conta de luz.',q:'E quais diferenciais do prédio importam?',hint:'Escolha até 5.',o:[
+  ['Portaria 24h'],['Energia solar'],['Bicicletário'],['Wi-Fi nas áreas comuns'],['Espaço delivery'],['Sustentabilidade']]},
+ {k:'regioes',t:'multi',f:'Regiões',dica:'Se escolher só uma região, pergunte se toparia uma vizinha com metrô. Isso amplia as opções.',q:'Em quais regiões você toparia morar?',hint:'Pode escolher mais de uma.',o:[
+  ['Zona Leste'],['Zona Sul'],['Zona Norte'],['Zona Oeste'],['Centro'],['Indiferente']]}
+];
+/* ícones (Phosphor duotone) por opção + paleta pastel [fundo, traço] que alterna entre as opções */
+var ICONE={'Sonho da casa própria':'heart','Quero investir':'chart-line-up','Família cresceu':'baby','Morar perto do trabalho':'briefcase','Sair do aluguel':'key','Trocar de imóvel':'arrows-left-right',
+ 'Vou morar sozinho(a)':'user','Comprador(a) e parceiro(a)':'users','Família com filhos':'users-three','Com pet':'paw-print','Com familiares':'users-four',
+ 'Usa metrô':'train','Usa carro':'car','Home office':'laptop','Depende de ônibus':'bus','Prefere tudo perto de casa':'person-simple-walk',
+ 'Studio':'couch','1 dormitório':'bed','2 dormitórios':'house-line',
+ 'Melhor localização':'map-pin','Menor parcela':'wallet','Maior apartamento':'arrows-out','Melhor condomínio':'buildings','Maior valorização':'trend-up',
+ 'Piscina':'swimming-pool','Academia':'barbell','Playground':'smiley','Salão de festas':'confetti','Espaço gourmet':'cooking-pot','Churrasqueira':'fire','Espaço pet':'paw-print',
+ 'Quadra esportiva':'soccer-ball','Beach tênis':'tennis-ball','Sauna':'thermometer-hot','Brinquedoteca':'puzzle-piece','Sala de jogos':'game-controller','Coworking':'desktop','Indiferente':'compass',
+ 'Portaria 24h':'shield-check','Energia solar':'sun','Bicicletário':'bicycle','Wi-Fi nas áreas comuns':'wifi-high','Espaço delivery':'package','Sustentabilidade':'leaf',
+ 'Zona Leste':'map-pin','Zona Sul':'map-pin','Zona Norte':'map-pin','Zona Oeste':'map-pin','Centro':'buildings'};
+var PASTEL=[['#FCE4E6','#B8404C'],['#FFF1D6','#A8680F'],['#E3F3EA','#2A7F55'],['#E4EEFA','#3563A8'],['#EFE6F8','#7447A8'],['#FBE6F0','#B0427A'],['#E1F3F2','#23827C'],['#FFEBDF','#B35A22']];
+var ANS={},STEP=0,LAST=null,LOADING=false,RISE=-1,JA_VIU_RESULTADO=false;
+/* passos visíveis: alguns só aparecem conforme respostas anteriores (ex.: aluguel) */
+function VIS(){return STEPS.filter(function(s){return !s.cond||s.cond()})}
+var ROTEIRO=true;try{ROTEIRO=localStorage.getItem('imovelideal_roteiro')!=='0'}catch(e){}
+function toggleRoteiro(){ROTEIRO=!ROTEIRO;try{localStorage.setItem('imovelideal_roteiro',ROTEIRO?'1':'0')}catch(e){}renderWiz()}
+
+function ansText(st){var v=ANS[st.k];if(!v||(Array.isArray(v)&&!v.length))return'';
+ if(st.t==='money')return v===st.zero?v:brl(cur(v));
+ if(Array.isArray(v)){var t=v.join(', ');return t.length>19?v[0]+' +'+(v.length-1):t}
+ return v}
+function clip(s,n){return s.length>n?s.slice(0,n-1)+'…':s}
+function respondido(st){var v=ANS[st.k];if(st.t==='multi')return (v||[]).length>0;if(st.t==='money')return (!!st.zero&&v===st.zero)||cur(v)>=(st.min||1);return !!v}
+/* até onde dá pra pular: todos os andares respondidos + o primeiro em aberto */
+function alcance(){var V=VIS();for(var i=0;i<V.length;i++)if(!respondido(V[i]))return i;return V.length-1}
+function irPara(i){var V=VIS();if(i<0||i>=V.length||i>alcance())return;RISE=-1;STEP=i;
+ g('result').classList.remove('on');g('quiz').classList.add('on');renderWiz();window.scrollTo(0,0)}
+function inicio(){irPara(0)}
+
+/* prédio: 1 andar por pergunta, com térreo (portaria + marquise), lajes aparentes, caixilhos, sacadas e
+   janelas acesas nos andares prontos; pilares, fôrma tracejada e andaime no andar em obra; grua baixando a
+   próxima laje. ao completar, a grua sai e entram platibanda, caixa d'água e antena.
+   rótulos (pergunta + resposta) ficam à esquerda; andares alcançáveis são clicáveis. */
+function building(step,allDone,clicavel){var V=VIS(),N=V.length,lim=clicavel?alcance():-1;
+ var W=380,base=548,terreo=38,x0=168,w=150,topo=92,H=Math.floor((base-terreo-topo)/N),out='';
+ var y0=base-terreo,topY=y0-H*N,cx=x0+w/2,VINHO='#5C0A10',LAJE='#3E060A',VIDRO='#F8E8E9',ACESA='#FCE1A8',LINHA='#E2C9CC',CINZA='#B9AFB2';
+ out+='<svg viewBox="0 0 '+W+' 600" role="img" aria-label="'+(allDone?'Perfil completo':'Andar '+(step+1)+' de '+N)+'" xmlns="http://www.w3.org/2000/svg">';
+ /* chão: calçada, rua, árvore */
+ out+='<rect x="0" y="'+base+'" width="'+W+'" height="8" fill="#E7CBCE"/><rect x="0" y="'+(base+8)+'" width="'+W+'" height="44" fill="#EFD9DB"/>'
+  +'<g stroke="#fff" stroke-width="3" stroke-dasharray="18 14" opacity=".7"><line x1="0" y1="'+(base+30)+'" x2="'+W+'" y2="'+(base+30)+'"/></g>'
+  +'<rect x="'+(x0-32)+'" y="'+(base-16)+'" width="4" height="16" fill="#8D6E63"/><circle cx="'+(x0-30)+'" cy="'+(base-24)+'" r="12" fill="#A8D5B5"/><circle cx="'+(x0-37)+'" cy="'+(base-19)+'" r="7" fill="#8CC7A0"/>';
+ /* térreo: pilotis, portaria de vidro, marquise e placa da marca */
+ out+='<rect x="'+x0+'" y="'+y0+'" width="'+w+'" height="'+terreo+'" fill="'+(step>0||allDone?'#4A080D':'#fff')+'" stroke="'+(step>0||allDone?'none':LINHA)+'" stroke-width="1.5"/>'
+  +'<rect x="'+(cx-16)+'" y="'+(y0+12)+'" width="32" height="'+(terreo-12)+'" fill="#DCEBF2"/><line x1="'+cx+'" y1="'+(y0+12)+'" x2="'+cx+'" y2="'+base+'" stroke="#9FB8C4" stroke-width="1.5"/>'
+  +'<rect x="'+(cx-28)+'" y="'+(y0+7)+'" width="56" height="5" fill="#2A0407"/>'
+  +'<rect x="'+(x0+10)+'" y="'+(y0+14)+'" width="22" height="9" rx="1.5" fill="#EC1C24"/>'
+  +'<rect x="'+(x0+w-34)+'" y="'+(y0+14)+'" width="22" height="16" fill="#DCEBF2" opacity=".8"/>';
+ for(var i=0;i<N;i++){var y=y0-H*(i+1),done=allDone||i<step,now=!allDone&&i===step,st=V[i],resp=respondido(st);
+  var go=clicavel&&i<=lim&&i!==step,cls=((done&&i===RISE&&!REDUCED)?'fl-rise ':'')+(go?'fl-go':'');
+  out+='<g'+(cls?' class="'+cls+'"':'')+(go?' data-go="'+i+'" role="button" tabindex="0" aria-label="Voltar para a pergunta: '+esc(st.f)+'"':'')+'>'+(go?'<title>Voltar para: '+esc(st.f)+'</title>':'');
+  out+='<rect x="0" y="'+y+'" width="'+(x0+w+8)+'" height="'+H+'" fill="transparent"/>';
+  var nj=3,ww=Math.floor((w-40)/nj),wh=H-16,gap=(w-nj*ww)/(nj+1);
+  if(done){
+   out+='<rect class="fl-body" x="'+x0+'" y="'+y+'" width="'+w+'" height="'+H+'" fill="'+VINHO+'"/>'
+    +'<rect x="'+(x0-4)+'" y="'+(y+H-4)+'" width="'+(w+8)+'" height="4" fill="'+LAJE+'"/>';
+   for(var j=0;j<nj;j++){var wx=x0+gap+j*(ww+gap),wy=y+6,acesa=((i*7+j*3)%5===0);
+    out+='<rect x="'+wx+'" y="'+wy+'" width="'+ww+'" height="'+wh+'" fill="'+(acesa?ACESA:VIDRO)+'"/>'
+     +'<line x1="'+(wx+ww/2)+'" y1="'+wy+'" x2="'+(wx+ww/2)+'" y2="'+(wy+wh)+'" stroke="'+VINHO+'" stroke-width="1.5"/>'
+     +'<line x1="'+wx+'" y1="'+(wy+wh*.45)+'" x2="'+(wx+ww)+'" y2="'+(wy+wh*.45)+'" stroke="'+VINHO+'" stroke-width="1"/>'}
+   /* sacada com guarda-corpo em andares alternados */
+   if(i%2===0){var bx=x0+gap-4,bw=ww+8,by=y+H-4-12;
+    out+='<rect x="'+bx+'" y="'+(y+H-6)+'" width="'+bw+'" height="3" fill="'+LAJE+'"/><rect x="'+bx+'" y="'+by+'" width="'+bw+'" height="2" fill="#F1E4E5"/>';
+    for(var b=0;b<=6;b++)out+='<line x1="'+(bx+b*bw/6)+'" y1="'+by+'" x2="'+(bx+b*bw/6)+'" y2="'+(y+H-6)+'" stroke="#F1E4E5" stroke-width="1"/>'}
+  }else if(now){
+   /* em obra: pilares, fôrma tracejada, andaime */
+   out+='<rect class="fl-body" x="'+(x0+1)+'" y="'+(y+1)+'" width="'+(w-2)+'" height="'+(H-2)+'" fill="#fff" stroke="#D3141C" stroke-width="2" stroke-dasharray="6 5"/>';
+   [x0+2,cx-4,x0+w-10].forEach(function(px){out+='<rect x="'+px+'" y="'+(y+2)+'" width="8" height="'+(H-4)+'" fill="'+CINZA+'"/>'});
+   var ax=x0+w+6;out+='<g stroke="'+CINZA+'" stroke-width="1.5"><line x1="'+ax+'" y1="'+(y-6)+'" x2="'+ax+'" y2="'+(y0)+'"/><line x1="'+(ax+10)+'" y1="'+(y-6)+'" x2="'+(ax+10)+'" y2="'+(y0)+'"/>';
+   for(var yy=y;yy<y0;yy+=14)out+='<line x1="'+ax+'" y1="'+yy+'" x2="'+(ax+10)+'" y2="'+(yy+14>y0?y0:yy+14)+'"/>';
+   out+='</g>';
+  }else{
+   out+='<rect class="fl-body" x="'+(x0+1)+'" y="'+(y+1)+'" width="'+(w-2)+'" height="'+(H-2)+'" fill="'+(go?'#fff':'none')+'" stroke="'+LINHA+'" stroke-width="1.2" stroke-dasharray="3 4"/>';
+  }
+  /* rótulos à esquerda */
+  var lx=x0-14;
+  if(done||(!now&&resp))out+='<text x="'+lx+'" y="'+(y+H/2-3)+'" text-anchor="end" font-family="Inter,sans-serif" font-size="11" fill="#6B6065">'+esc(st.f)+'</text>'
+   +'<text x="'+lx+'" y="'+(y+H/2+12)+'" text-anchor="end" font-family="Space Grotesk,sans-serif" font-weight="600" font-size="13" fill="#1A1416">'+esc(clip(ansText(st),19))+'</text>';
+  else if(now)out+='<text x="'+lx+'" y="'+(y+H/2+4)+'" text-anchor="end" font-family="Inter,sans-serif" font-size="12" fill="#D3141C">em obra</text>';
+  out+='</g>'}
+ if(allDone){
+  /* cobertura: platibanda, casa de máquinas, caixa d'água, antena */
+  out+='<g class="fl-rise"><rect x="'+(x0-4)+'" y="'+(topY-8)+'" width="'+(w+8)+'" height="8" fill="'+LAJE+'"/>'
+   +'<rect x="'+(x0+18)+'" y="'+(topY-30)+'" width="44" height="22" fill="'+VINHO+'"/>'
+   +'<rect x="'+(x0+w-58)+'" y="'+(topY-36)+'" width="36" height="20" rx="2" fill="#8F8589"/><line x1="'+(x0+w-54)+'" y1="'+(topY-16)+'" x2="'+(x0+w-54)+'" y2="'+(topY-8)+'" stroke="#8F8589" stroke-width="3"/><line x1="'+(x0+w-26)+'" y1="'+(topY-16)+'" x2="'+(x0+w-26)+'" y2="'+(topY-8)+'" stroke="#8F8589" stroke-width="3"/>'
+   +'<line x1="'+(x0+40)+'" y1="'+(topY-30)+'" x2="'+(x0+40)+'" y2="'+(topY-62)+'" stroke="'+VINHO+'" stroke-width="2"/><circle cx="'+(x0+40)+'" cy="'+(topY-63)+'" r="3" fill="#EC1C24"/></g>';
+ }else{
+  /* grua: torre treliçada à direita, lança sobre o prédio, carrinho e gancho com a laje do andar atual */
+  var tx=W-30,jibY=topY-44,hookX=cx,cur=y0-H*(step+1);
+  out+='<g stroke="#A8A0A3" stroke-width="2" fill="none"><line x1="'+(tx-6)+'" y1="'+base+'" x2="'+(tx-6)+'" y2="'+jibY+'"/><line x1="'+(tx+6)+'" y1="'+base+'" x2="'+(tx+6)+'" y2="'+jibY+'"/>';
+  for(var ty=base;ty>jibY+12;ty-=16)out+='<line x1="'+(tx-6)+'" y1="'+ty+'" x2="'+(tx+6)+'" y2="'+(ty-16)+'" stroke-width="1.2"/>';
+  out+='<line x1="'+(x0+10)+'" y1="'+jibY+'" x2="'+(tx+24)+'" y2="'+jibY+'"/><line x1="'+(x0+10)+'" y1="'+(jibY+6)+'" x2="'+(tx+24)+'" y2="'+(jibY+6)+'" stroke-width="1.2"/>';
+  for(var jx=x0+10;jx<tx+20;jx+=12)out+='<line x1="'+jx+'" y1="'+jibY+'" x2="'+(jx+12)+'" y2="'+(jibY+6)+'" stroke-width="1"/>';
+  out+='<line x1="'+tx+'" y1="'+(jibY-18)+'" x2="'+(x0+30)+'" y2="'+jibY+'" stroke-width="1.2"/><line x1="'+tx+'" y1="'+(jibY-18)+'" x2="'+(tx+24)+'" y2="'+jibY+'" stroke-width="1.2"/><line x1="'+tx+'" y1="'+(jibY-18)+'" x2="'+tx+'" y2="'+jibY+'"/></g>'
+   +'<rect x="'+(tx+12)+'" y="'+(jibY+6)+'" width="14" height="12" fill="#8F8589"/>'
+   +'<rect x="'+(tx-9)+'" y="'+(jibY+6)+'" width="18" height="12" rx="2" fill="#F5C518"/>'
+   +'<rect x="'+(hookX-6)+'" y="'+(jibY+6)+'" width="12" height="5" fill="#8F8589"/>'
+   +'<g class="'+(REDUCED?'':'hook')+'"><line x1="'+hookX+'" y1="'+(jibY+11)+'" x2="'+hookX+'" y2="'+(cur-16)+'" stroke="#6B6065" stroke-width="1.2"/>'
+   +'<path d="M'+(hookX-3)+' '+(cur-16)+' l3 4 l3 -4" stroke="#6B6065" stroke-width="1.5" fill="none"/>'
+   +'<line x1="'+hookX+'" y1="'+(cur-12)+'" x2="'+(hookX-24)+'" y2="'+(cur-4)+'" stroke="#6B6065" stroke-width="1"/><line x1="'+hookX+'" y1="'+(cur-12)+'" x2="'+(hookX+24)+'" y2="'+(cur-4)+'" stroke="#6B6065" stroke-width="1"/>'
+   +'<rect x="'+(hookX-28)+'" y="'+(cur-5)+'" width="56" height="5" fill="'+CINZA+'"/></g>';
+ }
+ out+='</svg>';
+ return out}
+
+function answered(){return respondido(VIS()[STEP])}
+function startQuiz(){ANS={};STEP=0;JA_VIU_RESULTADO=false;LAST=null;RISE=-1;g('result').classList.remove('on');g('quiz').classList.add('on');carregarEstoque();renderWiz();window.scrollTo(0,0)}
+function qBack(){if(STEP>0){STEP--;RISE=-1;renderWiz()}}
+function qAdvance(){if(!answered())return;if(STEP<VIS().length-1){RISE=STEP;STEP++;renderWiz();return}finish()}
+function pick(v){var st=VIS()[STEP];
+ if(st.t==='multi'){var maxSel=st.max||99,arr=(ANS[st.k]||[]).slice();
+  if(v==='Indiferente')arr=['Indiferente'];
+  else{arr=arr.filter(function(x){return x!=='Indiferente'});var ix=arr.indexOf(v);if(ix>=0)arr.splice(ix,1);else if(arr.length<maxSel)arr.push(v)}
+  ANS[st.k]=arr}
+ else ANS[st.k]=v;
+ renderPicks()}
+
+function hintHtml(st){var arr=ANS[st.k]||[];
+ return esc(st.hint)+(st.t==='multi'&&st.max&&arr.length?' <b>'+arr.length+' de '+st.max+' escolhidas.</b>':'')}
+function renderWiz(){var V=VIS(),st=V[STEP],N=V.length,body;
+ if(st.t==='money'){
+  var mv=ANS[st.k]===st.zero?'':(ANS[st.k]||'');
+  body='<div class="money"><input id="qmoney" inputmode="numeric" autocomplete="off" placeholder="R$ 0" aria-label="'+esc(st.f)+'" value="'+esc(mv)+'">'
+   +'<div class="chips" aria-label="Valores comuns">'+(st.chips||[]).map(function(c){return '<button type="button" data-money="'+c+'">'+brl(c)+'</button>'}).join('')
+   +(st.zero?'<button type="button" class="zero" data-zero="1" aria-pressed="'+(ANS[st.k]===st.zero)+'">'+esc(st.zero)+'</button>':'')+'</div></div>';
+ }else{
+  var isMulti=st.t==='multi',v=ANS[st.k],arr=isMulti?(v||[]):[],maxSel=st.max||99;
+  var cls=st.o.length<=3?'opts one':(isMulti&&st.o.length>8?'opts tri':'opts');
+  body='<div class="'+cls+'" role="'+(isMulti?'group':'radiogroup')+'" aria-labelledby="qhint">'+st.o.map(function(o,i){var sel=isMulti?arr.indexOf(o[0])>=0:v===o[0],off=isMulti&&!sel&&arr.length>=maxSel&&o[0]!=='Indiferente';
+   var ic=ICONE[o[0]]||'circle',pz=PASTEL[i%PASTEL.length];
+   return '<button type="button" class="opt'+(isMulti?' multi':'')+(sel?' sel':'')+(off?' off':'')+'" style="--pb:'+pz[0]+';--pc:'+pz[1]+'" data-v="'+esc(o[0])+'" role="'+(isMulti?'checkbox':'radio')+'" aria-checked="'+sel+'">'
+    +'<span class="ico" aria-hidden="true"><i class="ph-duotone ph-'+ic+'"></i></span><span class="mk" aria-hidden="true"></span><span><span class="ot">'+esc(o[0])+'</span>'+(o[1]?'<span class="od">'+esc(o[1])+'</span>':'')+'</span></button>'}).join('')+'</div>';
+ }
+ var track='';for(var i=0;i<N;i++)track+='<i class="'+(i<STEP?'done':i===STEP?'now':'')+'"></i>';
+ g('quiz').innerHTML='<div class="q-main">'
+  +'<div class="q-top"><button type="button" class="logo-btn" onclick="inicio()" title="Voltar para a primeira pergunta"><img class="logo" src="'+LOGO+'" alt="Metrocasa: voltar ao início"></button><div class="right"><button type="button" class="rot" onclick="toggleRoteiro()" aria-pressed="'+ROTEIRO+'"><span class="sw" aria-hidden="true"></span>Roteiro do corretor</button><span class="q-count">Pergunta <b>'+(STEP+1)+'</b> de '+N+'</span></div></div>'
+  +'<div class="q-track" aria-hidden="true">'+track+'</div>'
+  +'<div class="q-body"><div class="q-inner">'
+  +'<h1 class="q-title" tabindex="-1">'+esc(st.q)+'</h1><p class="q-hint" id="qhint">'+hintHtml(st)+'</p>'+body
+  +(ROTEIRO&&st.dica?'<p class="q-dica"><i class="ph-duotone ph-chat-circle-dots" aria-hidden="true"></i><span><b>Para o corretor:</b> '+esc(st.dica)+'</span></p>':'')+'</div></div>'
+  +'<div class="q-foot"><button type="button" class="btn-ghost" onclick="qBack()"'+(STEP===0?' style="visibility:hidden"':'')+'>Voltar</button>'
+  +'<span class="note">Usamos as respostas só para ordenar as unidades do estoque.</span>'
+  +'<span class="btns">'+(JA_VIU_RESULTADO&&STEP<N-1&&alcance()===N-1&&respondido(V[N-1])?'<button type="button" class="btn-line" onclick="finish()">Ver unidades</button>':'')
+  +'<button type="button" class="btn" id="qnext" onclick="qAdvance()"'+(answered()?'':' disabled')+'>'+(STEP===N-1?'Ver unidades compatíveis':'Continuar')+'</button></span></div>'
+  +'</div><aside class="q-side" aria-label="Perguntas respondidas">'+building(STEP,false,true)+'</aside>';
+ var mi=g('qmoney');
+ if(mi){mi.oninput=function(){var d=this.value.replace(/[^0-9]/g,'');this.value=d?brl(+d):'';ANS[st.k]=this.value;g('qnext').disabled=!answered()};
+  setTimeout(function(){try{mi.focus()}catch(e){}},30)}
+ else{var t=g('quiz').querySelector('.q-title');if(t&&LAST!==STEP)try{t.focus({preventScroll:true})}catch(e){}}
+ LAST=STEP}
+function renderPicks(){var st=VIS()[STEP],isMulti=st.t==='multi',v=ANS[st.k],arr=isMulti?(v||[]):[],maxSel=st.max||99;
+ g('quiz').querySelectorAll('.opt').forEach(function(b){var cv=b.getAttribute('data-v');
+  var sel=isMulti?arr.indexOf(cv)>=0:v===cv,off=isMulti&&!sel&&arr.length>=maxSel&&cv!=='Indiferente';
+  b.classList.toggle('sel',sel);b.classList.toggle('off',off);b.setAttribute('aria-checked',sel?'true':'false')});
+ g('qhint').innerHTML=hintHtml(st);
+ g('qnext').disabled=!answered()}
+g('quiz').addEventListener('click',function(e){
+ var fl=e.target.closest&&e.target.closest('[data-go]');if(fl){irPara(+fl.getAttribute('data-go'));return}
+ var st=VIS()[STEP];
+ var z=e.target.closest('[data-zero]');if(z){ANS[st.k]=st.zero;renderWiz();return}
+ var c=e.target.closest('[data-money]');if(c){ANS[st.k]=brl(+c.getAttribute('data-money'));renderWiz();return}
+ var b=e.target.closest('.opt');if(!b||b.classList.contains('off'))return;pick(b.getAttribute('data-v'))});
+document.addEventListener('keydown',function(e){if(!g('quiz').classList.contains('on')||LOADING)return;var t=e.target;
+ if(t&&t.getAttribute&&t.getAttribute('data-go')!=null&&(e.key==='Enter'||e.key===' ')){e.preventDefault();irPara(+t.getAttribute('data-go'));return}
+ if(t&&t.tagName==='INPUT'){if(e.key==='Enter'&&answered())qAdvance();return}
+ if(e.key==='ArrowLeft'){qBack();return}
+ if(e.key==='ArrowRight'||e.key==='Enter'){if(e.key==='Enter'&&t&&t.closest&&t.closest('.opt,button'))return;if(answered())qAdvance()}});
+
+/* ===== estoque (tabela `estoque`, fallback `unidades`+esta_na_sv) ===== */
+var UNITS=null,UNITS_P=null,REG_IDX={},ENT_IDX={},EST_ATUALIZADO=null;
+async function fetchAll_(tbl,cols,order){var out=[],page=1000,from=0;
+ while(true){var q=sb.from(tbl).select(cols);(order||[]).forEach(function(o){q=q.order(o)});
+  var r=await q.range(from,from+page-1);if(r.error)throw r.error;
+  out=out.concat(r.data||[]);if(!r.data||r.data.length<page)break;from+=page}
+ return out}
+function carregarEstoque(){
+ if(UNITS_P)return UNITS_P;
+ UNITS_P=(async function(){
+  try{var ob=await fetchAll_('obras_andamento','empreendimento,regiao,entrega_prevista',['empreendimento']);
+   ob.forEach(function(x){REG_IDX[x.empreendimento]=x.regiao||'';ENT_IDX[x.empreendimento]=x.entrega_prevista||null})}
+  catch(e){try{var rg=await fetchAll_('obras_andamento','empreendimento,regiao',['empreendimento']);rg.forEach(function(x){REG_IDX[x.empreendimento]=x.regiao||''})}catch(e2){console.warn('obras indisponíveis',e2&&e2.message)}}
+  try{var est=await fetchAll_('estoque','empreendimento,unidade,tipologia,area_total,categoria,valor_tabela,regiao',['empreendimento','unidade']);
+   if(est&&est.length){UNITS=est;
+    try{var at=await sb.from('estoque').select('atualizado_em').order('atualizado_em',{ascending:false}).limit(1);
+     if(at.data&&at.data[0])EST_ATUALIZADO=at.data[0].atualizado_em}catch(e){}
+    return UNITS}}catch(e){console.warn('estoque indisponível, usando unidades',e&&e.message)}
+  try{var uni=await fetchAll_('unidades','empreendimento,unidade,tipologia,area_total,destinacao,classificacao,valor_tabela,esta_na_sv',['empreendimento','unidade']);
+   UNITS=uni.filter(function(u){var sv=(u.esta_na_sv==null?'':String(u.esta_na_sv)).trim().toLowerCase();return !(sv&&sv.charAt(0)==='n')})
+    .map(function(u){return{empreendimento:u.empreendimento,unidade:u.unidade,tipologia:u.tipologia,area_total:u.area_total,categoria:u.destinacao||u.classificacao,valor_tabela:u.valor_tabela,regiao:''}})}
+  catch(e2){console.error('falha ao carregar estoque',e2);UNITS=[]}
+  return UNITS})();
+ return UNITS_P}
+
+/* ===== poder de compra estimado (aproximação do fluxo do Motor, sem montar o fluxo) =====
+   financiamento CAIXA máx. da faixa de renda (FIN) + subsídio (com dependente se "família com filhos")
+   + mensais pré-chaves (15% da renda até R$4.500, 20% acima) × meses até a entrega
+   + anuais pré-chaves (100% da renda por ano cheio até a entrega)
+   + pós-chaves: menor entre % do valor da unidade e 10% da renda × prazo (studio/1D 20%·48m, 1D+office 20%·60m, 2D 25%·60m).
+   sem data de entrega cadastrada, assume 24 meses. */
+function mesesAte(iso){if(!iso)return 24;var p=String(iso).split('-');if(p.length<2)return 24;
+ var d=new Date(+p[0],(+p[1]||1)-1,1),n=new Date();return Math.max(0,(d.getFullYear()-n.getFullYear())*12+d.getMonth()-n.getMonth())}
+function poderBase(){var renda=cur(ANS.renda),f=finLookup(renda),dep=/filhos/i.test(ANS.composicao||'');
+ return{renda:renda,f:f,fin:f.maxCom,sub:dep?f.subC:f.subS,dep:dep,mensal:r2(renda*(renda>RULES.compCorte?RULES.compAcima:RULES.compAbaixo)/100)}}
+function poderUnidade(P,u,k){var valor=+u.valor_tabela||0,m=mesesAte(ENT_IDX[u.empreendimento]);
+ var pre=P.mensal*m+P.renda*(RULES.anuMultBase/100)*Math.floor(m/12);
+ var pr=RULES.pos[k]||RULES.pos.resto,pos=Math.min(valor*pr.pct/100,P.renda*(RULES.posPctRenda/100)*pr.meses);
+ /* parcela depois das chaves ≈ parcela CAIXA proporcional ao valor financiado + pós-chaves mensal */
+ var finUsado=Math.min(P.fin,Math.max(0,valor-P.sub-pre-pos)),parcFin=P.f.maxCom?P.f.parcela*finUsado/P.f.maxCom:0,posMes=pr.meses?pos/pr.meses:0;
+ return{total:r2(P.fin+P.sub+pre+pos),pre:r2(pre),pos:r2(pos),meses:m,entregaConhecida:!!ENT_IDX[u.empreendimento],
+  parcFin:r2(parcFin),posMes:r2(posMes),depois:r2(parcFin+posMes)}}
+
+/* ===== compatibilidade — nota absoluta 0-100 =====
+   planta 30 · cabe no bolso 25 · região 20 · prioridade 10 · quem vai morar 8 · deslocamento 7.
+   unidades de categoria fora da faixa de renda (HIS-1/HIS-2) saem da lista.
+   lazer/diferenciais ainda não têm dado por empreendimento na base → não pontuam. */
+var METRO_ZONES=['ZONA LESTE','ZONA SUL','CENTRO'];
+function tipKind(t){t=snorm(t);
+ if(t.indexOf('STUDIO')>=0||t.indexOf('STD')>=0)return'studio';
+ if(/(^|\D)2\s*D|2\s*DORM/.test(t))return'2d';
+ if(t.indexOf('OFFICE')>=0)return'1do';
+ if(/(^|\D)1\s*D|1\s*DORM/.test(t))return'1d';
+ return'outro'}
+var TIP_ORD=['studio','1d','1do','2d','outro'];
+var TIP_LBL={studio:'Studio','1d':'1 dormitório','1do':'1 dorm. + office','2d':'2 dormitórios',outro:'Especiais'};
+var TIP_PTS={
+ 'Studio':{studio:30,'1d':13,'1do':9,'2d':0,outro:4},
+ '1 dormitório':{studio:10,'1d':30,'1do':26,'2d':10,outro:4},
+ '2 dormitórios':{studio:0,'1d':7,'1do':19,'2d':30,outro:4}};
+function compPts(comp,k){var t;
+ if(/sozinho|pet/i.test(comp))t={studio:8,'1d':8,'1do':6,'2d':4,outro:4};
+ else if(/parceiro/i.test(comp))t={studio:4,'1d':8,'1do':8,'2d':6,outro:4};
+ else if(/filhos|familiares/i.test(comp))t={studio:0,'1d':2,'1do':5,'2d':8,outro:4};
+ else return 4;
+ return t[k]}
+function regOfU(u){return u.regiao||REG_IDX[u.empreendimento]||''}
+function percentil(sorted,v){if(sorted.length<2)return .5;var lo=0,hi=sorted.length;while(lo<hi){var m=(lo+hi)>>1;if(sorted[m]<v)lo=m+1;else hi=m}return lo/(sorted.length-1)}
+/* número do andar+apto a partir do código da unidade ("U-0104" → 104, "2-0501" → 501, "1-0003 NR" → 3):
+   último grupo de 3+ dígitos; quanto maior, mais alto o andar */
+function andarDe(unid){var m=String(unid||'').match(/\d{3,}/g);return m?parseInt(m[m.length-1],10):-1}
+function cap(s){s=String(s||'').toLowerCase();return s.replace(/(^|\s)\S/g,function(c){return c.toUpperCase()})}
+
+/* empreendimentos no estoque que ainda não foram lançados — não entram na recomendação (tirar daqui quando lançar) */
+var NAO_LANCADOS=['CLUBE GUARAPIRANGA - MODULO II','CLUBE VILA DAS BELEZAS - MODULO II'];
+var TOP_POR_PLANTA=15,MAX_POR_EMP=3; /* top 15 por planta; no máx. 3 unidades do mesmo empreendimento em cada planta, p/ variar a lista e o mapa */
+var PB=null,PICKS=[],SCORED=[],TOPS={},TODAS=[],FILTRO='',AVALIADAS=0,FORA_FAIXA=0;
+function pontuar(){
+ PB=poderBase();
+ /* vagas de garagem não são moradia, e empreendimentos ainda não lançados: ficam fora da recomendação */
+ var U=(UNITS||[]).filter(function(u){return !/VAGA/.test(snorm(u.tipologia))&&NAO_LANCADOS.indexOf(snorm(u.empreendimento))<0}),elig=catElegiveis(PB.renda);
+ var regs=(ANS.regioes||[]).filter(function(r){return r!=='Indiferente'}).map(snorm),useReg=regs.length>0;
+ var desl=(ANS.deslocamento||'').toLowerCase(),querTransp=/metr|nibus|perto/.test(desl),prio=ANS.prioridade||'';
+ AVALIADAS=U.length;
+ U=U.filter(function(u){var c=((u.categoria||'')+'').toUpperCase().trim();return !c||elig[c]});
+ FORA_FAIXA=AVALIADAS-U.length;
+ /* diagnóstico: nomes de tipologia do estoque que não caíram em studio/1D/1D+office/2D */
+ var outras={};U.forEach(function(u){if(tipKind(u.tipologia)==='outro'){var t=u.tipologia||'(vazio)';outras[t]=(outras[t]||0)+1}});
+ if(Object.keys(outras).length)console.log('tipologias em "Especiais":',JSON.stringify(outras));
+ var precos=U.map(function(u){return +u.valor_tabela||0}).filter(Boolean).sort(function(a,b){return a-b});
+ var areas=U.map(function(u){return +u.area_total||0}).filter(Boolean).sort(function(a,b){return a-b});
+ SCORED=U.map(function(u){
+  var k=tipKind(u.tipologia),rg=regOfU(u),rgN=snorm(rg),why=[],s=0,p;
+  p=(TIP_PTS[ANS.tipologia]||{})[k];if(p==null)p=4;s+=p;
+  why.push(p>=26?['ok','Planta que você procura']:['',p>=13?'Planta próxima da escolhida':'Planta diferente da escolhida']);
+  /* bolso */
+  var pw=poderUnidade(PB,u,k),valor=+u.valor_tabela||0,ratio=valor?pw.total/valor:1,fit;
+  if(ratio>=1){s+=25;fit=['ok','Cabe no poder de compra']}
+  else if(ratio>=.92){s+=16;fit=['lim','No limite: faltam '+mil(valor-pw.total)]}
+  else if(ratio>=.85){s+=8;fit=['no','Acima: faltam '+mil(valor-pw.total)]}
+  else fit=['no','Acima: faltam '+mil(valor-pw.total)];
+  /* região */
+  if(!useReg)s+=20;
+  else if(!rg){s+=8;why.push(['','Região não informada'])}
+  else if(regs.indexOf(rgN)>=0){s+=20;why.push(['ok','Região escolhida'])}
+  else why.push(['','Fora das regiões escolhidas']);
+  s+=compPts(ANS.composicao||'',k);
+  if(querTransp){if(rg&&METRO_ZONES.indexOf(rgN)>=0){s+=7;why.push(['ok','Boa oferta de transporte'])}else s+=3}
+  else s+=7;
+  var pp=7;
+  if(/parcela/i.test(prio)&&valor){var q=percentil(precos,valor);pp=Math.round(10*(1-q));if(q<=.33)why.push(['ok','Entre os menores preços'])}
+  else if(/apartamento/i.test(prio)&&+u.area_total){var a=percentil(areas,+u.area_total);pp=Math.round(10*a);if(a>=.67)why.push(['ok','Entre as maiores metragens'])}
+  else if(/localiza/i.test(prio)){pp=(rg&&(regs.indexOf(rgN)>=0||rgN==='CENTRO'))?10:5}
+  s+=pp;
+  why.sort(function(a,b){return (b[0]==='ok')-(a[0]==='ok')});
+  return{u:u,k:k,rg:rg,pct:Math.max(0,Math.min(100,Math.round(s))),why:why,fit:fit,poder:pw.total,meses:pw.meses,pw:pw}});
+ SCORED.sort(function(a,b){
+  if(b.pct!==a.pct)return b.pct-a.pct;
+  if(/apartamento/i.test(prio))return (+b.u.area_total||0)-(+a.u.area_total||0);
+  return (+a.u.valor_tabela||0)-(+b.u.valor_tabela||0)});
+ /* unidades iguais (mesmo empreendimento + tipologia + metragem inteira, sem as casas decimais: 27,04 e 27,34 = 27 m²)
+    aparecem uma vez só: fica a do andar mais alto */
+ var grupo={};SCORED.forEach(function(x){var key=snorm(x.u.empreendimento)+'|'+snorm(x.u.tipologia)+'|'+(x.u.area_total==null?'':Math.floor(+x.u.area_total));
+  var gr=grupo[key]=grupo[key]||{best:null,n:0};gr.n++;if(!gr.best||andarDe(x.u.unidade)>andarDe(gr.best.u.unidade))gr.best=x});
+ var UNICAS=[];SCORED.forEach(function(x){var key=snorm(x.u.empreendimento)+'|'+snorm(x.u.tipologia)+'|'+(x.u.area_total==null?'':Math.floor(+x.u.area_total));
+  if(grupo[key].best===x){x.iguais=grupo[key].n-1;UNICAS.push(x)}});
+ /* top N por planta, respeitando o limite por empreendimento */
+ TOPS={};TIP_ORD.forEach(function(k){var porEmp={},out=[];
+  for(var i=0;i<UNICAS.length&&out.length<TOP_POR_PLANTA;i++){var x=UNICAS[i];if(x.k!==k)continue;
+   var e=snorm(x.u.empreendimento);if((porEmp[e]||0)>=MAX_POR_EMP)continue;porEmp[e]=(porEmp[e]||0)+1;out.push(x)}
+  if(out.length)TOPS[k]=out});
+ /* 3 escolhas p/ induzir a decisão: a recomendada + uma mais barata e uma maior, com nota parecida */
+ PICKS=[];var rec=UNICAS[0];
+ if(rec){PICKS.push({tipo:'rec',x:rec});
+  var usados=[rec],vRec=+rec.u.valor_tabela||0,aRec=+rec.u.area_total||0;
+  var melhor=function(lista,fn){return lista.filter(function(x){return usados.indexOf(x)<0}).sort(fn)[0]};
+  var faixa=function(margem,cond){return UNICAS.filter(function(x){return x.pct>=rec.pct-margem&&cond(x)})};
+  var porValor=function(a,b){return (+a.u.valor_tabela||0)-(+b.u.valor_tabela||0)},porArea=function(a,b){return (+b.u.area_total||0)-(+a.u.area_total||0)};
+  var cEco=function(x){return x.fit[0]==='ok'&&(+x.u.valor_tabela||0)<=vRec*.95},cEsp=function(x){return x.fit[0]!=='no'&&(+x.u.area_total||0)>=aRec+1};
+  var eco=melhor(faixa(12,cEco),porValor)||melhor(faixa(25,cEco),porValor);
+  if(eco){PICKS.push({tipo:'eco',x:eco});usados.push(eco)}
+  var esp=melhor(faixa(12,cEsp),porArea)||melhor(faixa(25,cEsp),porArea);
+  if(esp){PICKS.push({tipo:'esp',x:esp});usados.push(esp)}}
+ TODAS=[];Object.keys(TOPS).forEach(function(k){TODAS=TODAS.concat(TOPS[k])});
+ TODAS.sort(function(a,b){return b.pct-a.pct||(+a.u.valor_tabela||0)-(+b.u.valor_tabela||0)})}
+
+/* ===== conclusão: prédio completo enquanto cruza com o estoque ===== */
+function finish(){LOADING=true;RISE=VIS().length-1;
+ g('quiz').innerHTML='<div class="q-load"><div class="msg"><img class="logo" src="'+LOGO+'" alt="Metrocasa" style="margin-bottom:40px">'
+  +'<h2>Perfil completo. Agora vamos às unidades.</h2><p>Comparando suas respostas e seu poder de compra com o estoque disponível.</p>'
+  +'<div class="bar-ind" role="progressbar" aria-label="Carregando"><i></i></div></div>'
+  +'<aside class="q-side" aria-hidden="true">'+building(VIS().length,true)+'</aside></div>';
+ Promise.all([new Promise(function(r){setTimeout(r,REDUCED?600:2200)}),carregarEstoque()]).then(function(){
+  LOADING=false;pontuar();FILTRO='';JA_VIU_RESULTADO=true;
+  g('quiz').classList.remove('on');g('result').classList.add('on');renderResult();window.scrollTo(0,0);salvarPesquisa()})}
+
+function lvl(p){return p>=80?'hi':p>=60?'md':'lo'}
+var MESES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+function entregaLbl(emp){var e=ENT_IDX[emp];if(!e)return'';var p=String(e).split('-');return MESES[(+p[1]||1)-1]+'/'+p[0]}
+function aluguelAtual(){var st=STEPS.filter(function(s){return s.k==='aluguel'})[0];if(st.cond&&!st.cond())return 0;return ANS.aluguel===st.zero?0:cur(ANS.aluguel)}
+/* frases de venda com dado real da unidade: aluguel × parcela, entrega das chaves, andar */
+function pitch(x){var out=[],al=aluguelAtual(),pw=x.pw,d=pw.depois;
+ if(al>0&&d>0){var dif=al-d;
+  if(dif>=50)out.push(['coins','Depois das chaves, cerca de '+brl(Math.round(d))+'/mês: '+brl(Math.round(dif))+' a menos que o aluguel de hoje']);
+  else if(dif>-al*.15)out.push(['coins','Depois das chaves, cerca de '+brl(Math.round(d))+'/mês, parecido com o aluguel de hoje, só que o imóvel é seu']);
+  else out.push(['coins','Depois das chaves, cerca de '+brl(Math.round(d))+'/mês'])}
+ if(pw.entregaConhecida){
+  if(pw.meses<=0)out.push(['key','Obra pronta ou em fase final de entrega']);
+  else out.push(['key','Chaves em '+entregaLbl(x.u.empreendimento)+', daqui a '+pw.meses+(pw.meses===1?' mês':' meses')+(al>0?' você deixa o aluguel':'')])}
+ if(x.iguais)out.push(['arrow-fat-lines-up','Andar mais alto disponível desta planta']);
+ return out.slice(0,2)}
+function pitchHtml(x){var p=pitch(x);return p.length?'<div class="pitch">'+p.map(function(t){return '<span><i class="ph-duotone ph-'+t[0]+'" aria-hidden="true"></i>'+esc(t[1])+'</span>'}).join('')+'</div>':''}
+function fmtData(d){var x=new Date(d);return x.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' às '+x.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
+function listaAtual(){return FILTRO?(TOPS[FILTRO]||[]):TODAS}
+var PICK_LBL={rec:['Recomendada','star','#FCE4E6','#B8404C'],eco:['Mais econômica','piggy-bank','#E3F3EA','#2A7F55'],esp:['Mais espaço','arrows-out','#E4EEFA','#3563A8']};
+function picksHtml(){if(!PICKS.length)return'';var rec=PICKS[0].x;
+ return '<section class="picks" aria-label="Três opções para decidir">'+PICKS.map(function(pk){var x=pk.x,u=x.u,L=PICK_LBL[pk.tipo],dl='';
+  if(pk.tipo==='eco')dl=mil((+rec.u.valor_tabela||0)-(+u.valor_tabela||0))+' a menos que a recomendada';
+  if(pk.tipo==='esp')dl=String(Math.round(((+u.area_total||0)-(+rec.u.area_total||0))*10)/10).replace('.',',')+' m² a mais que a recomendada';
+  return '<button type="button" class="pick'+(pk.tipo==='rec'?' rec':'')+'" data-emp="'+esc(snorm(u.empreendimento))+'" style="--pb:'+L[2]+';--pc:'+L[3]+'">'
+   +'<span class="lab"><span class="ico" aria-hidden="true"><i class="ph-duotone ph-'+L[1]+'"></i></span>'+L[0]+'</span>'
+   +'<span class="nm">'+esc(u.empreendimento)+'</span>'
+   +'<span class="mt">Unidade '+esc(u.unidade)+', '+esc(u.tipologia||TIP_LBL[x.k])+(u.area_total!=null?', '+String(u.area_total).replace('.',',')+' m²':'')+(x.rg?', '+esc(cap(x.rg)):'')+'</span>'
+   +'<span class="pr"><b>'+(u.valor_tabela!=null?brl(u.valor_tabela):'—')+'</b><span style="color:var(--'+(x.pct>=80?'ok':x.pct>=60?'vinho':'grafite')+')">'+x.pct+'%</span></span>'
+   +(dl?'<span class="dl">'+dl+'</span>':'')+pitchHtml(x)+'</button>'}).join('')+'</section>'}
+function cmpAluguel(){var al=aluguelAtual();if(!al||!PICKS.length)return'';var pw=PICKS[0].x.pw;
+ return '<div class="cmp">Hoje: <b>'+brl(al)+'</b> de aluguel. Na recomendada, depois das chaves: cerca de <b>'+brl(Math.round(pw.depois))+'/mês</b> (financiamento '+brl(Math.round(pw.parcFin))+' + pós-chaves '+brl(Math.round(pw.posMes))+').'+(pw.meses>0?' Até a entrega, a parcela com a Metrocasa é de <b>'+brl(PB.mensal)+'/mês</b>, paga junto com o aluguel.':' A obra já está pronta ou em fase final, então o aluguel acaba logo.')+'</div>'}
+/* abre o WhatsApp (o corretor escolhe o contato e envia) com as 3 opções; sem renda nem dado pessoal no texto */
+function enviarWhats(){if(!PICKS.length)return;
+ var t='Olá! Separei '+(PICKS.length===1?'uma opção':PICKS.length+' opções')+' da Metrocasa para você:\n';
+ PICKS.forEach(function(pk){var x=pk.x,u=x.u,geo=geoOf(u.empreendimento),ent=entregaLbl(u.empreendimento);
+  t+='\n*'+PICK_LBL[pk.tipo][0]+'*: '+u.empreendimento+', unidade '+u.unidade+', '+(u.tipologia||TIP_LBL[x.k])+(u.area_total!=null?', '+String(u.area_total).replace('.',',')+' m²':'')
+   +(u.valor_tabela!=null?', '+brl(u.valor_tabela):'')+(ent?(x.pw.meses<=0?'. Obra pronta ou em fase final de entrega':'. Chaves em '+ent):'')
+   +(geo?'. Localização: https://maps.google.com/?q='+geo.lat+','+geo.lng:'')+'\n'});
+ t+='\nValores de tabela sujeitos a alteração. Vamos conversar?';
+ window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank','noopener')}
+function renderResult(){
+ var top='<div class="r-top"><button type="button" class="logo-btn" onclick="inicio()" title="Voltar às perguntas"><img class="logo" src="'+LOGO+'" alt="Metrocasa: voltar ao início"></button><div class="acts">'
+  +'<button class="btn-wa" onclick="enviarWhats()"><i class="ph-duotone ph-whatsapp-logo" aria-hidden="true"></i>Enviar no WhatsApp</button><button class="btn-line" onclick="copiarLista()">Copiar lista</button><button class="btn-line" onclick="startQuiz()">Novo atendimento</button></div></div>';
+ if(!AVALIADAS){g('result').innerHTML='<div class="r-app"><div class="r-left">'+top+'<div class="empty"><b>O estoque não carregou.</b>A consulta ao banco não retornou unidades. Confira a conexão e toque em "Novo atendimento" para tentar de novo.</div></div></div>';return}
+ var altos=TODAS.filter(function(x){return x.pct>=80}).length;
+ var h1=altos?'Separamos as unidades que mais combinam com você':'Estas são as unidades mais próximas do seu perfil';
+ var lead=(EST_ATUALIZADO?'Estoque atualizado em '+fmtData(EST_ATUALIZADO)+'. ':'')+'Toque numa resposta abaixo para ajustar o perfil.';
+ /* perfil em chips clicáveis: cada um volta para a pergunta correspondente */
+ var V=VIS(),rot={renda:'Renda',aluguel:'Aluguel',tipologia:'Planta',composicao:'Mora com',prioridade:'Prioridade',regioes:'Regiões',deslocamento:'Rotina',motivo:'Motivo',lazer:'Lazer',diferenciais:'Diferenciais'};
+ var ordem=['tipologia','renda','aluguel','composicao','regioes','prioridade','deslocamento','motivo','lazer','diferenciais'];
+ var pchips=ordem.map(function(k){var ix=-1;V.forEach(function(st,i){if(st.k===k)ix=i});if(ix<0)return'';var t=ansText(V[ix]);if(!t)return'';
+  return '<button type="button" class="pchip" data-step="'+ix+'" title="Alterar esta resposta"><span>'+rot[k]+'</span><b>'+esc(t)+'</b></button>'}).join('');
+ var pods=SCORED.map(function(x){return x.poder}).sort(function(a,b){return a-b}),pMin=pods[0]||0,pMax=pods[pods.length-1]||0;
+ var poder='<section class="poder" aria-label="Poder de compra estimado"><div><h2>Poder de compra estimado</h2><div class="big"><span>'+mil(pMin)+'</span>'+(pMax-pMin>5000?' <small>a</small> <span>'+mil(pMax)+'</span>':'')+'</div></div>'
+  +'<dl style="margin:0"><dt>Financiamento CAIXA</dt><dd>'+mil(PB.fin)+'</dd></dl>'
+  +'<dl style="margin:0"><dt>Subsídio'+(PB.dep?' (com dependentes)':'')+'</dt><dd>'+(PB.sub?mil(PB.sub):'Sem subsídio')+'</dd></dl>'
+  +'<dl style="margin:0"><dt>Parcela até a entrega</dt><dd>'+brl(PB.mensal)+'/mês</dd></dl>'
+  +cmpAluguel()+'</section>';
+ var filtro='<div class="filtro" role="group" aria-label="Filtrar por planta"><button data-f="" aria-pressed="'+(!FILTRO)+'">Todas</button>'
+  +TIP_ORD.filter(function(k){return TOPS[k]}).map(function(k){return '<button data-f="'+k+'" aria-pressed="'+(FILTRO===k)+'">'+TIP_LBL[k]+'</button>'}).join('')+'</div>';
+ var list=listaAtual();
+ var rows=list.map(function(x,i){var u=x.u,l=lvl(x.pct);
+  var meta='Unidade '+esc(u.unidade)+', '+esc(u.tipologia||TIP_LBL[x.k])+(u.area_total!=null?', '+String(u.area_total).replace('.',',')+' m²':'')+(x.rg?', '+esc(cap(x.rg)):'');
+  var oks=x.why.filter(function(w){return w[0]==='ok'}).slice(0,3);
+  return '<li class="row" data-emp="'+esc(snorm(u.empreendimento))+'" tabindex="0"><span class="pos">'+(i+1)+'</span>'
+   +'<div class="name">'+esc(u.empreendimento)+'</div><div class="meta">'+meta+'</div>'
+   +'<div class="pct '+l+'"><div class="v">'+x.pct+'<small>%</small></div><div class="t"><i style="width:'+x.pct+'%"></i></div></div>'
+   +'<div class="buy"><span class="price">'+(u.valor_tabela!=null?brl(u.valor_tabela):'—')+'</span><span class="fit '+x.fit[0]+'">'+esc(x.fit[1])+'</span></div>'
+   +pitchHtml(x)
+   +(oks.length?'<div class="why">'+oks.map(function(w){return '<span class="ok">'+esc(w[1])+'</span>'}).join('')+'</div>':'')+'</li>'}).join('');
+ g('result').innerHTML='<div class="r-app"><div class="r-left">'+top
+  +'<h1 class="r-h1">'+h1+'</h1><p class="r-lead">'+lead+'</p>'
+  +'<div class="pchips">'+pchips+'</div>'
+  +picksHtml()+poder
+  +'<section class="lista" aria-label="Todas as unidades compatíveis">'+filtro
+  +'<p class="listnote">'+(FILTRO?'As unidades de '+TIP_LBL[FILTRO].toLowerCase()+' mais compatíveis.':'As mais compatíveis de cada planta.')+' Unidades iguais aparecem uma vez, sempre a do andar mais alto.</p>'
+  +'<ol class="rank">'+rows+'</ol></section>'
+  +'<p class="metodo">Poder de compra é uma estimativa para orientar a conversa, não uma simulação de crédito: soma o financiamento máximo da faixa de renda, o subsídio, as parcelas até a entrega de cada obra e o pós-chaves. A proposta final sai do Motor de Cálculo. Compatibilidade: planta 30 pontos, caber no poder de compra 25, região 20, prioridade 10, quem vai morar 8 e deslocamento 7. Valores de tabela sujeitos a alteração.</p></div>'
+  +'<aside class="r-map"><div id="map" role="region" aria-label="Mapa dos empreendimentos da lista"></div><div class="mapnote" id="mapnote" hidden></div></aside></div>';
+ desenharMapa(list)}
+
+/* ===== mapa (Leaflet). sem mapa-base: só o limite do município de SP (IBGE) em cinza-claro
+   sobre fundo cinza-escuro; 1 pino por empreendimento da lista em exibição ===== */
+var SP_LIMITE=[[-23.9678,-46.6119],[-23.9665,-46.6116],[-23.9659,-46.6104],[-23.9636,-46.6082],[-23.9603,-46.6097],[-23.959,-46.6088],[-23.9573,-46.6066],[-23.9565,-46.6073],[-23.9537,-46.6073],[-23.9535,-46.6079],[-23.9511,-46.6111],[-23.9488,-46.6092],[-23.9485,-46.6078],[-23.9458,-46.6078],[-23.9448,-46.6071],[-23.9413,-46.6088],[-23.9406,-46.6079],[-23.9387,-46.6071],[-23.9372,-46.6083],[-23.937,-46.6098],[-23.9379,-46.6114],[-23.9381,-46.613],[-23.9369,-46.6138],[-23.9368,-46.6154],[-23.9353,-46.6164],[-23.9336,-46.6169],[-23.9306,-46.6164],[-23.9314,-46.6144],[-23.9298,-46.6119],[-23.928,-46.6116],[-23.9277,-46.6094],[-23.9243,-46.6107],[-23.9229,-46.6091],[-23.9203,-46.6091],[-23.9191,-46.6101],[-23.918,-46.61],[-23.9159,-46.6087],[-23.915,-46.6088],[-23.9144,-46.6117],[-23.9107,-46.6116],[-23.9087,-46.6128],[-23.9079,-46.6117],[-23.9046,-46.6093],[-23.9055,-46.6133],[-23.9011,-46.6142],[-23.9,-46.6153],[-23.8972,-46.6157],[-23.8958,-46.6154],[-23.8948,-46.616],[-23.8921,-46.6165],[-23.8888,-46.6177],[-23.8852,-46.618],[-23.8844,-46.6176],[-23.8798,-46.6167],[-23.8788,-46.6171],[-23.8763,-46.6156],[-23.8695,-46.617],[-23.8651,-46.6165],[-23.862,-46.6169],[-23.8607,-46.6187],[-23.8584,-46.6227],[-23.8567,-46.6247],[-23.8545,-46.6295],[-23.8526,-46.6318],[-23.8511,-46.6326],[-23.8385,-46.6351],[-23.836,-46.635],[-23.8341,-46.6341],[-23.8317,-46.6342],[-23.8295,-46.6338],[-23.8272,-46.6324],[-23.822,-46.6277],[-23.8195,-46.6248],[-23.8188,-46.6244],[-23.8135,-46.6234],[-23.802,-46.6231],[-23.7862,-46.6228],[-23.784,-46.6235],[-23.7816,-46.6251],[-23.7594,-46.6436],[-23.7572,-46.6455],[-23.7537,-46.647],[-23.7505,-46.6474],[-23.7407,-46.649],[-23.7358,-46.6506],[-23.7308,-46.652],[-23.731,-46.6513],[-23.7301,-46.6501],[-23.7289,-46.6465],[-23.7273,-46.6403],[-23.7253,-46.6365],[-23.7209,-46.6322],[-23.7192,-46.6302],[-23.7163,-46.6276],[-23.7164,-46.6257],[-23.7158,-46.6225],[-23.7127,-46.6182],[-23.7105,-46.6164],[-23.7084,-46.617],[-23.7073,-46.6185],[-23.7072,-46.6212],[-23.7054,-46.6229],[-23.7052,-46.6244],[-23.7025,-46.624],[-23.7021,-46.625],[-23.7029,-46.6263],[-23.701,-46.6273],[-23.7003,-46.6285],[-23.6979,-46.6289],[-23.6964,-46.6317],[-23.6939,-46.6316],[-23.6932,-46.6325],[-23.6917,-46.6326],[-23.6913,-46.6351],[-23.6899,-46.6357],[-23.688,-46.6339],[-23.6845,-46.633],[-23.6824,-46.6336],[-23.6816,-46.6333],[-23.6799,-46.6306],[-23.6771,-46.6305],[-23.6729,-46.6311],[-23.6709,-46.6285],[-23.6685,-46.6271],[-23.666,-46.6268],[-23.6632,-46.6268],[-23.6596,-46.6264],[-23.6593,-46.6251],[-23.6613,-46.6228],[-23.6605,-46.6224],[-23.6593,-46.62],[-23.6584,-46.6197],[-23.6573,-46.6172],[-23.658,-46.6163],[-23.6603,-46.6144],[-23.6586,-46.6102],[-23.6563,-46.6068],[-23.6561,-46.6038],[-23.6543,-46.6022],[-23.653,-46.5989],[-23.6529,-46.5966],[-23.6517,-46.5955],[-23.6507,-46.5931],[-23.6489,-46.59],[-23.6452,-46.5846],[-23.641,-46.5834],[-23.6353,-46.5849],[-23.6341,-46.5846],[-23.6325,-46.5824],[-23.6288,-46.5814],[-23.626,-46.5831],[-23.6208,-46.5822],[-23.6045,-46.5793],[-23.6019,-46.5794],[-23.6008,-46.5788],[-23.6003,-46.5775],[-23.6011,-46.5748],[-23.6051,-46.5683],[-23.6073,-46.5654],[-23.6118,-46.558],[-23.612,-46.5566],[-23.6107,-46.5543],[-23.609,-46.5533],[-23.6061,-46.5507],[-23.6056,-46.5497],[-23.6061,-46.548],[-23.6057,-46.5467],[-23.6079,-46.5448],[-23.6144,-46.5345],[-23.6141,-46.5322],[-23.6147,-46.5311],[-23.6138,-46.5293],[-23.614,-46.5214],[-23.6152,-46.5207],[-23.6161,-46.5183],[-23.6173,-46.5178],[-23.6183,-46.5159],[-23.619,-46.5131],[-23.6218,-46.5116],[-23.6237,-46.5098],[-23.6258,-46.5062],[-23.6254,-46.5027],[-23.6238,-46.5001],[-23.6238,-46.4987],[-23.6249,-46.4972],[-23.6243,-46.4959],[-23.6254,-46.4931],[-23.6243,-46.4923],[-23.6246,-46.4905],[-23.624,-46.4878],[-23.6229,-46.4868],[-23.623,-46.4855],[-23.6238,-46.4845],[-23.6237,-46.4822],[-23.6255,-46.4791],[-23.6262,-46.4772],[-23.6297,-46.4765],[-23.6308,-46.4754],[-23.6327,-46.4756],[-23.6346,-46.4751],[-23.6365,-46.4736],[-23.6373,-46.4737],[-23.6388,-46.4723],[-23.6388,-46.4631],[-23.6402,-46.4606],[-23.6419,-46.4582],[-23.6411,-46.4559],[-23.6409,-46.454],[-23.6424,-46.4525],[-23.6436,-46.4474],[-23.6439,-46.4431],[-23.6422,-46.4409],[-23.6419,-46.4383],[-23.6413,-46.436],[-23.6418,-46.4329],[-23.6411,-46.4315],[-23.6391,-46.4319],[-23.6374,-46.4317],[-23.6362,-46.4302],[-23.637,-46.4279],[-23.6407,-46.4243],[-23.643,-46.4245],[-23.6443,-46.4233],[-23.6437,-46.4211],[-23.6424,-46.4213],[-23.641,-46.4201],[-23.6414,-46.4184],[-23.6406,-46.4162],[-23.6392,-46.4145],[-23.636,-46.4138],[-23.6355,-46.4118],[-23.6339,-46.4102],[-23.6335,-46.4088],[-23.6318,-46.4068],[-23.6298,-46.4064],[-23.6287,-46.4074],[-23.6269,-46.408],[-23.6236,-46.4066],[-23.6232,-46.4051],[-23.6237,-46.4037],[-23.6224,-46.4014],[-23.6205,-46.4003],[-23.619,-46.3982],[-23.6158,-46.3977],[-23.6143,-46.3955],[-23.6125,-46.3948],[-23.6093,-46.3961],[-23.608,-46.3986],[-23.6058,-46.3994],[-23.6043,-46.3971],[-23.6022,-46.3954],[-23.6017,-46.3935],[-23.603,-46.392],[-23.6032,-46.3908],[-23.602,-46.3902],[-23.6009,-46.3872],[-23.6007,-46.3845],[-23.5995,-46.3831],[-23.598,-46.3831],[-23.596,-46.3842],[-23.5944,-46.383],[-23.5921,-46.3827],[-23.5909,-46.3822],[-23.5884,-46.38],[-23.5892,-46.3778],[-23.5878,-46.3776],[-23.5852,-46.3798],[-23.5838,-46.3798],[-23.5807,-46.382],[-23.5803,-46.3835],[-23.5778,-46.3835],[-23.577,-46.3817],[-23.5767,-46.3796],[-23.5749,-46.3778],[-23.5741,-46.379],[-23.5736,-46.3811],[-23.5726,-46.3814],[-23.5722,-46.3827],[-23.5708,-46.3835],[-23.5688,-46.3835],[-23.5682,-46.3825],[-23.5666,-46.3826],[-23.5649,-46.3804],[-23.5625,-46.3799],[-23.563,-46.3824],[-23.5618,-46.3869],[-23.561,-46.3889],[-23.5597,-46.3909],[-23.5558,-46.3928],[-23.5543,-46.3925],[-23.5522,-46.3932],[-23.5509,-46.3951],[-23.5492,-46.3945],[-23.5493,-46.392],[-23.5472,-46.3882],[-23.5457,-46.3877],[-23.5434,-46.3887],[-23.5414,-46.3904],[-23.5403,-46.392],[-23.5372,-46.3937],[-23.5338,-46.3938],[-23.532,-46.3945],[-23.5309,-46.3956],[-23.5296,-46.3941],[-23.5305,-46.3923],[-23.5294,-46.3908],[-23.5279,-46.3898],[-23.526,-46.3867],[-23.5237,-46.3843],[-23.523,-46.386],[-23.5216,-46.3866],[-23.5204,-46.3831],[-23.5186,-46.3826],[-23.5168,-46.3808],[-23.5162,-46.3796],[-23.5161,-46.3768],[-23.5153,-46.3744],[-23.5138,-46.3745],[-23.5131,-46.3753],[-23.5114,-46.3732],[-23.5112,-46.3707],[-23.5122,-46.3664],[-23.5099,-46.3658],[-23.5087,-46.366],[-23.5038,-46.3651],[-23.5,-46.3672],[-23.4975,-46.3693],[-23.495,-46.3699],[-23.4924,-46.3716],[-23.4898,-46.3737],[-23.4848,-46.3769],[-23.481,-46.3786],[-23.4788,-46.3787],[-23.478,-46.3798],[-23.4756,-46.3812],[-23.4721,-46.3819],[-23.4741,-46.3843],[-23.4755,-46.3836],[-23.4747,-46.3867],[-23.4758,-46.3863],[-23.4768,-46.387],[-23.4797,-46.3863],[-23.482,-46.3878],[-23.4823,-46.3887],[-23.4806,-46.3919],[-23.4827,-46.3952],[-23.4842,-46.3966],[-23.4832,-46.3997],[-23.4856,-46.4009],[-23.4868,-46.4011],[-23.485,-46.4034],[-23.4861,-46.4057],[-23.4851,-46.4066],[-23.4816,-46.4062],[-23.4808,-46.404],[-23.4794,-46.4056],[-23.4781,-46.4044],[-23.4763,-46.4059],[-23.4775,-46.4064],[-23.4769,-46.4081],[-23.4755,-46.4085],[-23.4741,-46.4097],[-23.4729,-46.4077],[-23.4722,-46.4078],[-23.4716,-46.4101],[-23.4704,-46.4106],[-23.4705,-46.4121],[-23.4726,-46.4152],[-23.473,-46.4184],[-23.4744,-46.419],[-23.4731,-46.4217],[-23.4727,-46.4248],[-23.472,-46.4265],[-23.4734,-46.4299],[-23.4758,-46.4298],[-23.4772,-46.4333],[-23.4764,-46.4335],[-23.4757,-46.436],[-23.4769,-46.4363],[-23.4786,-46.4352],[-23.4798,-46.4376],[-23.4801,-46.4396],[-23.4794,-46.442],[-23.4808,-46.4467],[-23.4818,-46.4513],[-23.4828,-46.4572],[-23.4825,-46.4585],[-23.483,-46.4605],[-23.4828,-46.4633],[-23.4823,-46.4659],[-23.4802,-46.4713],[-23.4784,-46.4749],[-23.4776,-46.4784],[-23.4769,-46.48],[-23.4771,-46.4855],[-23.4776,-46.4886],[-23.476,-46.4938],[-23.4769,-46.4989],[-23.4773,-46.503],[-23.4784,-46.5078],[-23.4788,-46.5111],[-23.4797,-46.5127],[-23.4813,-46.5164],[-23.4825,-46.5187],[-23.4842,-46.5203],[-23.4843,-46.5218],[-23.4855,-46.5233],[-23.4891,-46.5261],[-23.4912,-46.5285],[-23.4934,-46.5339],[-23.4964,-46.5363],[-23.4987,-46.5396],[-23.5004,-46.5414],[-23.5015,-46.5417],[-23.5037,-46.5436],[-23.5059,-46.5459],[-23.5064,-46.547],[-23.507,-46.5509],[-23.5078,-46.5533],[-23.5101,-46.5555],[-23.5071,-46.5591],[-23.5044,-46.5594],[-23.5,-46.5621],[-23.4992,-46.562],[-23.4964,-46.5605],[-23.494,-46.56],[-23.4897,-46.5599],[-23.4881,-46.5609],[-23.4841,-46.5614],[-23.4816,-46.561],[-23.4793,-46.5613],[-23.4777,-46.5608],[-23.4756,-46.561],[-23.4743,-46.5617],[-23.4728,-46.5617],[-23.4705,-46.5634],[-23.4687,-46.5653],[-23.4656,-46.5666],[-23.4647,-46.5678],[-23.4608,-46.5693],[-23.4588,-46.5705],[-23.4569,-46.5707],[-23.4542,-46.5704],[-23.4516,-46.5685],[-23.4494,-46.5686],[-23.4467,-46.567],[-23.4424,-46.5668],[-23.4415,-46.5653],[-23.4388,-46.5653],[-23.4357,-46.5649],[-23.435,-46.5666],[-23.4332,-46.5674],[-23.4324,-46.5685],[-23.4313,-46.5676],[-23.4295,-46.567],[-23.4274,-46.5657],[-23.4219,-46.5667],[-23.4188,-46.5661],[-23.4181,-46.5654],[-23.4164,-46.5669],[-23.4154,-46.5666],[-23.4131,-46.5631],[-23.4131,-46.5616],[-23.4108,-46.5598],[-23.4111,-46.5581],[-23.4096,-46.5564],[-23.408,-46.5561],[-23.4051,-46.5565],[-23.4016,-46.555],[-23.3986,-46.5563],[-23.3974,-46.5561],[-23.3949,-46.5538],[-23.3921,-46.5518],[-23.3911,-46.5501],[-23.3879,-46.5473],[-23.387,-46.5456],[-23.3856,-46.5457],[-23.3841,-46.5445],[-23.3808,-46.5447],[-23.3795,-46.5451],[-23.3768,-46.5452],[-23.3753,-46.5443],[-23.3739,-46.542],[-23.3706,-46.5389],[-23.3691,-46.5371],[-23.3668,-46.5377],[-23.3639,-46.5364],[-23.3633,-46.5354],[-23.3617,-46.5388],[-23.3605,-46.5405],[-23.3586,-46.5418],[-23.3575,-46.5434],[-23.3577,-46.547],[-23.3564,-46.5497],[-23.3577,-46.5518],[-23.3612,-46.5534],[-23.3638,-46.5552],[-23.3654,-46.558],[-23.3688,-46.5604],[-23.3699,-46.5638],[-23.3715,-46.566],[-23.3757,-46.5685],[-23.3761,-46.5702],[-23.3755,-46.5733],[-23.3739,-46.5758],[-23.3737,-46.5796],[-23.3746,-46.5807],[-23.3769,-46.581],[-23.3774,-46.5833],[-23.3789,-46.5841],[-23.3807,-46.5862],[-23.3813,-46.5886],[-23.3826,-46.5896],[-23.3849,-46.5928],[-23.3855,-46.5953],[-23.3882,-46.6002],[-23.3891,-46.6009],[-23.3909,-46.6005],[-23.3929,-46.5986],[-23.3951,-46.5995],[-23.3973,-46.6047],[-23.398,-46.6058],[-23.4018,-46.6091],[-23.4074,-46.6123],[-23.4102,-46.6114],[-23.4108,-46.6134],[-23.4117,-46.6143],[-23.4148,-46.6136],[-23.4167,-46.6125],[-23.4177,-46.6132],[-23.4183,-46.6193],[-23.417,-46.6208],[-23.417,-46.6232],[-23.4194,-46.6216],[-23.421,-46.6212],[-23.4227,-46.6218],[-23.4229,-46.6261],[-23.4234,-46.6274],[-23.4257,-46.6294],[-23.4267,-46.6311],[-23.4283,-46.6315],[-23.4293,-46.6343],[-23.4276,-46.6357],[-23.4273,-46.6386],[-23.4276,-46.6427],[-23.4282,-46.6455],[-23.4292,-46.6469],[-23.4292,-46.6513],[-23.4309,-46.6553],[-23.4305,-46.6571],[-23.4262,-46.6599],[-23.4254,-46.6608],[-23.424,-46.6642],[-23.421,-46.6667],[-23.4186,-46.6698],[-23.4192,-46.6725],[-23.4159,-46.676],[-23.4156,-46.6778],[-23.4169,-46.6799],[-23.4177,-46.6823],[-23.4193,-46.6847],[-23.4235,-46.6854],[-23.4255,-46.6854],[-23.427,-46.6866],[-23.426,-46.6885],[-23.4231,-46.6916],[-23.4228,-46.6929],[-23.4242,-46.6952],[-23.4243,-46.6967],[-23.4239,-46.699],[-23.4225,-46.7004],[-23.4188,-46.6999],[-23.4173,-46.7001],[-23.4175,-46.7023],[-23.4165,-46.7073],[-23.4165,-46.7085],[-23.4144,-46.7093],[-23.4106,-46.7093],[-23.4074,-46.71],[-23.4065,-46.7106],[-23.4073,-46.714],[-23.4074,-46.7157],[-23.4061,-46.7179],[-23.4037,-46.7199],[-23.4015,-46.7203],[-23.3993,-46.7196],[-23.3975,-46.7203],[-23.3963,-46.7217],[-23.3948,-46.7251],[-23.3949,-46.727],[-23.3939,-46.7305],[-23.3909,-46.7336],[-23.3881,-46.7355],[-23.3889,-46.7371],[-23.3896,-46.7418],[-23.3893,-46.7428],[-23.3896,-46.7463],[-23.3893,-46.75],[-23.3901,-46.7511],[-23.3893,-46.7535],[-23.3877,-46.7541],[-23.3866,-46.7569],[-23.386,-46.7605],[-23.3871,-46.7613],[-23.3861,-46.7634],[-23.3849,-46.7641],[-23.3864,-46.7656],[-23.3867,-46.7672],[-23.3877,-46.7681],[-23.3887,-46.7702],[-23.3914,-46.7705],[-23.3923,-46.77],[-23.3953,-46.7709],[-23.3972,-46.7708],[-23.3971,-46.7741],[-23.3968,-46.7755],[-23.398,-46.7772],[-23.3989,-46.7773],[-23.3981,-46.7809],[-23.3989,-46.782],[-23.3987,-46.7834],[-23.3997,-46.7841],[-23.4034,-46.7826],[-23.4041,-46.7832],[-23.404,-46.7849],[-23.405,-46.786],[-23.4037,-46.7879],[-23.4038,-46.7888],[-23.4023,-46.7897],[-23.4025,-46.7911],[-23.3999,-46.7926],[-23.3996,-46.7937],[-23.4016,-46.7973],[-23.4021,-46.7989],[-23.4014,-46.8006],[-23.4002,-46.7987],[-23.399,-46.7987],[-23.3971,-46.8006],[-23.3956,-46.8014],[-23.3966,-46.8029],[-23.3969,-46.8058],[-23.3982,-46.8075],[-23.3993,-46.8075],[-23.3997,-46.8102],[-23.3988,-46.8123],[-23.3999,-46.8131],[-23.4001,-46.815],[-23.3994,-46.8173],[-23.4002,-46.8199],[-23.4013,-46.82],[-23.4015,-46.822],[-23.401,-46.823],[-23.4044,-46.8255],[-23.4062,-46.8242],[-23.4073,-46.8245],[-23.4089,-46.8262],[-23.411,-46.8246],[-23.4122,-46.8222],[-23.414,-46.8217],[-23.4153,-46.8204],[-23.4179,-46.8197],[-23.42,-46.8203],[-23.4205,-46.8223],[-23.4224,-46.8233],[-23.4253,-46.8226],[-23.4271,-46.8215],[-23.4289,-46.8196],[-23.4297,-46.8169],[-23.4317,-46.8156],[-23.4336,-46.8152],[-23.435,-46.8127],[-23.4369,-46.8115],[-23.4407,-46.8116],[-23.4423,-46.8095],[-23.4451,-46.8095],[-23.4462,-46.8091],[-23.448,-46.8093],[-23.4518,-46.8086],[-23.4558,-46.8059],[-23.4576,-46.8056],[-23.4601,-46.8058],[-23.4625,-46.8054],[-23.4659,-46.8022],[-23.467,-46.801],[-23.4693,-46.8003],[-23.4704,-46.8007],[-23.4714,-46.7995],[-23.4705,-46.7988],[-23.4699,-46.7971],[-23.4673,-46.7965],[-23.465,-46.7967],[-23.4629,-46.796],[-23.4627,-46.7943],[-23.4615,-46.792],[-23.4631,-46.7895],[-23.4657,-46.787],[-23.4662,-46.7854],[-23.4658,-46.7833],[-23.4639,-46.7818],[-23.465,-46.7806],[-23.4652,-46.7788],[-23.4647,-46.7764],[-23.4615,-46.7737],[-23.4606,-46.7736],[-23.4588,-46.772],[-23.4584,-46.7704],[-23.4613,-46.7721],[-23.4631,-46.7728],[-23.4644,-46.7748],[-23.4686,-46.7758],[-23.4706,-46.775],[-23.4718,-46.7751],[-23.4736,-46.7717],[-23.4747,-46.7706],[-23.4768,-46.7698],[-23.4798,-46.7705],[-23.4814,-46.77],[-23.4839,-46.7699],[-23.4868,-46.7678],[-23.4913,-46.7663],[-23.4919,-46.7655],[-23.4934,-46.7616],[-23.4933,-46.7599],[-23.4944,-46.7584],[-23.495,-46.756],[-23.4962,-46.7555],[-23.498,-46.7574],[-23.4998,-46.7575],[-23.5,-46.7598],[-23.5017,-46.7615],[-23.5056,-46.7638],[-23.5064,-46.764],[-23.5091,-46.7618],[-23.5103,-46.7619],[-23.5109,-46.7603],[-23.5125,-46.7596],[-23.5132,-46.7579],[-23.514,-46.7575],[-23.5158,-46.7578],[-23.5166,-46.7547],[-23.5174,-46.753],[-23.5197,-46.7531],[-23.5208,-46.7508],[-23.5204,-46.747],[-23.5237,-46.7485],[-23.5251,-46.7501],[-23.5254,-46.7514],[-23.5252,-46.7546],[-23.5246,-46.7564],[-23.5265,-46.7571],[-23.5292,-46.76],[-23.53,-46.7604],[-23.5327,-46.7599],[-23.5358,-46.7606],[-23.5389,-46.7597],[-23.5428,-46.7605],[-23.5463,-46.7605],[-23.549,-46.7588],[-23.55,-46.76],[-23.5519,-46.7593],[-23.555,-46.7602],[-23.557,-46.7623],[-23.5582,-46.7624],[-23.5593,-46.7634],[-23.5611,-46.7638],[-23.5616,-46.7648],[-23.5634,-46.7652],[-23.5637,-46.7668],[-23.5627,-46.7673],[-23.5629,-46.7689],[-23.5648,-46.7705],[-23.5651,-46.7719],[-23.5687,-46.7725],[-23.5701,-46.7731],[-23.571,-46.7786],[-23.5732,-46.7812],[-23.5747,-46.7818],[-23.5742,-46.7847],[-23.5745,-46.786],[-23.5767,-46.7873],[-23.5775,-46.7883],[-23.5778,-46.7913],[-23.5802,-46.7926],[-23.5812,-46.7946],[-23.5825,-46.7952],[-23.5826,-46.7967],[-23.5837,-46.798],[-23.583,-46.799],[-23.584,-46.8064],[-23.5856,-46.8074],[-23.5872,-46.8057],[-23.5887,-46.8051],[-23.5924,-46.8068],[-23.5938,-46.8067],[-23.5984,-46.8089],[-23.5999,-46.8089],[-23.601,-46.8081],[-23.6028,-46.8092],[-23.6042,-46.8078],[-23.6062,-46.8081],[-23.6084,-46.8074],[-23.6091,-46.8078],[-23.6089,-46.8046],[-23.6078,-46.8019],[-23.6077,-46.7999],[-23.6048,-46.7984],[-23.605,-46.7965],[-23.6065,-46.7944],[-23.6055,-46.7925],[-23.6055,-46.7906],[-23.6064,-46.789],[-23.6049,-46.7875],[-23.6037,-46.7843],[-23.6041,-46.7813],[-23.6035,-46.78],[-23.6022,-46.779],[-23.6029,-46.7771],[-23.6029,-46.7752],[-23.6006,-46.774],[-23.5998,-46.7717],[-23.6002,-46.7686],[-23.599,-46.7667],[-23.598,-46.7632],[-23.5949,-46.7607],[-23.5972,-46.759],[-23.5983,-46.7592],[-23.5995,-46.7581],[-23.5997,-46.7566],[-23.6007,-46.755],[-23.6028,-46.7508],[-23.605,-46.7498],[-23.6059,-46.75],[-23.6064,-46.7515],[-23.6086,-46.7516],[-23.6105,-46.7525],[-23.6115,-46.7539],[-23.6113,-46.7554],[-23.6129,-46.7581],[-23.6149,-46.7603],[-23.6174,-46.761],[-23.6188,-46.763],[-23.622,-46.7654],[-23.6237,-46.7674],[-23.6271,-46.7691],[-23.6284,-46.7722],[-23.6292,-46.7729],[-23.631,-46.7765],[-23.6341,-46.7777],[-23.6352,-46.7776],[-23.6372,-46.7809],[-23.6384,-46.7849],[-23.6394,-46.7852],[-23.6408,-46.7878],[-23.6423,-46.7887],[-23.6449,-46.7896],[-23.6472,-46.7927],[-23.6496,-46.7925],[-23.6521,-46.7919],[-23.6568,-46.7934],[-23.6582,-46.7934],[-23.6592,-46.7942],[-23.6603,-46.7939],[-23.6618,-46.7945],[-23.6638,-46.7945],[-23.6653,-46.7955],[-23.6668,-46.795],[-23.6703,-46.7955],[-23.674,-46.7973],[-23.6751,-46.7985],[-23.6768,-46.7987],[-23.6786,-46.8],[-23.6812,-46.7996],[-23.6847,-46.8015],[-23.6854,-46.8015],[-23.6866,-46.8015],[-23.6903,-46.7989],[-23.6938,-46.798],[-23.6954,-46.797],[-23.6964,-46.7975],[-23.6969,-46.7997],[-23.6985,-46.8],[-23.6987,-46.7982],[-23.7001,-46.7946],[-23.7005,-46.7927],[-23.7018,-46.7915],[-23.705,-46.7913],[-23.7063,-46.7921],[-23.7101,-46.793],[-23.7109,-46.7926],[-23.7133,-46.7932],[-23.7143,-46.7925],[-23.7183,-46.7925],[-23.7191,-46.7919],[-23.7204,-46.7927],[-23.7213,-46.7924],[-23.7247,-46.7943],[-23.7261,-46.7948],[-23.728,-46.7977],[-23.7291,-46.7985],[-23.7311,-46.7985],[-23.7359,-46.7956],[-23.7391,-46.796],[-23.7399,-46.793],[-23.7412,-46.7901],[-23.744,-46.7903],[-23.7467,-46.787],[-23.7471,-46.7857],[-23.7488,-46.7832],[-23.7507,-46.7815],[-23.7494,-46.78],[-23.7506,-46.7781],[-23.7506,-46.777],[-23.7524,-46.7766],[-23.753,-46.7757],[-23.7519,-46.7727],[-23.7529,-46.7699],[-23.7547,-46.7692],[-23.7578,-46.7692],[-23.7613,-46.7701],[-23.7636,-46.7712],[-23.7655,-46.7732],[-23.7659,-46.7753],[-23.7672,-46.7774],[-23.7703,-46.7797],[-23.7721,-46.7815],[-23.7731,-46.7862],[-23.7738,-46.7881],[-23.7761,-46.7901],[-23.7777,-46.7908],[-23.78,-46.791],[-23.7847,-46.7894],[-23.7862,-46.7896],[-23.7863,-46.7882],[-23.7876,-46.7887],[-23.7883,-46.7901],[-23.7899,-46.7891],[-23.7938,-46.7937],[-23.7975,-46.7965],[-23.7985,-46.7959],[-23.7997,-46.7966],[-23.8003,-46.7984],[-23.8014,-46.7993],[-23.8015,-46.8004],[-23.8047,-46.8007],[-23.8061,-46.8017],[-23.8079,-46.8019],[-23.8098,-46.8011],[-23.8111,-46.7962],[-23.8105,-46.7951],[-23.8113,-46.7918],[-23.8116,-46.7888],[-23.8127,-46.7863],[-23.8132,-46.7824],[-23.8142,-46.7805],[-23.8177,-46.775],[-23.8181,-46.7734],[-23.82,-46.7716],[-23.8214,-46.7689],[-23.8239,-46.7671],[-23.8266,-46.7632],[-23.8279,-46.7626],[-23.8306,-46.763],[-23.832,-46.7636],[-23.8334,-46.7656],[-23.8348,-46.7655],[-23.8346,-46.7632],[-23.8359,-46.7626],[-23.8386,-46.7634],[-23.8397,-46.763],[-23.8426,-46.7643],[-23.8436,-46.7674],[-23.8434,-46.7693],[-23.8438,-46.7735],[-23.8422,-46.7765],[-23.8416,-46.7784],[-23.8422,-46.7799],[-23.8464,-46.7789],[-23.8486,-46.7796],[-23.8491,-46.7791],[-23.8514,-46.7795],[-23.8554,-46.776],[-23.8926,-46.7766],[-23.8932,-46.7768],[-23.8943,-46.786],[-23.8948,-46.7877],[-23.8938,-46.7951],[-23.8931,-46.7964],[-23.8937,-46.799],[-23.8928,-46.8009],[-23.8904,-46.8009],[-23.889,-46.8014],[-23.8877,-46.803],[-23.8875,-46.8054],[-23.8865,-46.8074],[-23.8881,-46.8072],[-23.8918,-46.8062],[-23.8914,-46.8053],[-23.8952,-46.8046],[-23.8972,-46.8049],[-23.8998,-46.8069],[-23.9013,-46.8071],[-23.905,-46.8096],[-23.9061,-46.8109],[-23.9078,-46.8116],[-23.9115,-46.8111],[-23.9133,-46.8118],[-23.9152,-46.8111],[-23.9171,-46.8118],[-23.9186,-46.8107],[-23.9205,-46.8107],[-23.923,-46.8101],[-23.9293,-46.808],[-23.9308,-46.8083],[-23.9326,-46.808],[-23.9346,-46.807],[-23.9365,-46.8074],[-23.9382,-46.8069],[-23.9386,-46.8046],[-23.9378,-46.8013],[-23.938,-46.8001],[-23.9402,-46.796],[-23.9426,-46.7945],[-23.9431,-46.7928],[-23.9426,-46.7912],[-23.9409,-46.7898],[-23.9412,-46.7876],[-23.9423,-46.7856],[-23.9453,-46.7834],[-23.9469,-46.7835],[-23.9488,-46.7809],[-23.95,-46.7777],[-23.9499,-46.7757],[-23.9503,-46.7742],[-23.9529,-46.7749],[-23.9538,-46.7742],[-23.9564,-46.7751],[-23.9599,-46.772],[-23.961,-46.7716],[-23.9609,-46.7698],[-23.962,-46.7683],[-23.9612,-46.7663],[-23.9617,-46.7649],[-23.9632,-46.7633],[-23.9647,-46.7625],[-23.9662,-46.7637],[-23.9683,-46.7626],[-23.9691,-46.7611],[-23.9708,-46.7593],[-23.9725,-46.7583],[-23.9725,-46.7554],[-23.9732,-46.7548],[-23.9754,-46.7549],[-23.9759,-46.7559],[-23.9783,-46.7573],[-23.9787,-46.7591],[-23.9799,-46.7591],[-23.9806,-46.7582],[-23.9834,-46.7603],[-23.9848,-46.7604],[-23.9865,-46.7622],[-23.988,-46.7623],[-23.9885,-46.7644],[-23.9901,-46.7648],[-23.9917,-46.7664],[-23.995,-46.767],[-23.9961,-46.7682],[-23.9988,-46.7682],[-24.0008,-46.7709],[-24.0021,-46.7739],[-24.003,-46.7747],[-24.005,-46.7742],[-24.0064,-46.7723],[-24.0077,-46.772],[-24.0084,-46.7694],[-24.0063,-46.768],[-24.0054,-46.7664],[-24.0062,-46.7649],[-24.006,-46.7627],[-24.0032,-46.7612],[-24.0029,-46.7597],[-24.0013,-46.758],[-23.9968,-46.755],[-23.9958,-46.7522],[-23.9965,-46.751],[-23.9954,-46.7494],[-23.9943,-46.7492],[-23.9939,-46.7451],[-23.9919,-46.7427],[-23.9924,-46.7404],[-23.9919,-46.7376],[-23.9935,-46.736],[-23.9952,-46.7322],[-23.9955,-46.7303],[-23.9943,-46.7262],[-23.9943,-46.7244],[-23.993,-46.721],[-23.9946,-46.72],[-23.9958,-46.7175],[-23.9962,-46.7148],[-23.9954,-46.7136],[-23.9939,-46.7128],[-23.9934,-46.7103],[-23.991,-46.7081],[-23.9907,-46.7063],[-23.9916,-46.7034],[-23.9903,-46.6993],[-23.9883,-46.6967],[-23.9867,-46.6941],[-23.9844,-46.6921],[-23.9847,-46.6875],[-23.9824,-46.6855],[-23.9824,-46.6833],[-23.9832,-46.6824],[-23.9854,-46.6816],[-23.9872,-46.68],[-23.9894,-46.6754],[-23.9885,-46.6735],[-23.9891,-46.6717],[-23.9882,-46.6678],[-23.9881,-46.6653],[-23.9882,-46.6618],[-23.992,-46.6591],[-23.9932,-46.6566],[-23.9955,-46.6546],[-23.9967,-46.653],[-24.001,-46.6509],[-24.0016,-46.6499],[-23.9999,-46.6476],[-23.9987,-46.6437],[-23.9979,-46.6426],[-23.9978,-46.6404],[-23.9972,-46.6395],[-23.9954,-46.6389],[-23.9942,-46.6371],[-23.9948,-46.6351],[-23.9927,-46.6337],[-23.9923,-46.6314],[-23.9912,-46.6295],[-23.9899,-46.6304],[-23.988,-46.6331],[-23.9838,-46.6333],[-23.9811,-46.6348],[-23.9773,-46.6357],[-23.975,-46.6312],[-23.9742,-46.6305],[-23.9733,-46.6278],[-23.9725,-46.6277],[-23.9723,-46.625],[-23.9712,-46.6242],[-23.9713,-46.6229],[-23.9707,-46.6205],[-23.9696,-46.62],[-23.9678,-46.618],[-23.9681,-46.6167],[-23.9673,-46.6158],[-23.9685,-46.6133],[-23.9678,-46.6119]];
+var MAP=null,PINS={};
+function corNivel(p){return p>=80?'#1F7A5C':p>=60?'#5C0A10':'#8F8589'}
+function desenharMapa(list){
+ if(MAP){MAP.remove();MAP=null}PINS={};
+ if(!window.L){g('mapnote').hidden=false;g('mapnote').textContent='O mapa não carregou. Verifique a internet.';return}
+ var cidade=L.latLngBounds(SP_LIMITE);
+ MAP=L.map('map',{scrollWheelZoom:true,zoomControl:true,attributionControl:true,minZoom:9,maxZoom:16,maxBounds:cidade.pad(.35),maxBoundsViscosity:.8,zoomSnap:.25});
+ MAP.attributionControl.setPrefix(false).addAttribution('Limite municipal: IBGE');
+ /* ruas: base cinza-clara da Esri + camada de nomes; fora do município uma máscara cinza-escura cobre tudo */
+ var base=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,attribution:'Esri, HERE, Garmin, &copy; OpenStreetMap'}).addTo(MAP),erros=0;
+ base.on('tileerror',function(){if(++erros===4){MAP.removeLayer(base);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(MAP).bringToBack()}});
+ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,minZoom:12}).addTo(MAP);
+ var mundo=[[-90,-180],[-90,180],[90,180],[90,-180]];
+ L.polygon([mundo,SP_LIMITE],{stroke:false,fillColor:'#8F8589',fillOpacity:.45,interactive:false}).addTo(MAP);
+ L.polyline(SP_LIMITE.concat([SP_LIMITE[0]]),{color:'#6B6065',weight:1.5,interactive:false}).addTo(MAP);
+ var grupos={},semGeo={};
+ list.forEach(function(x,i){var k=snorm(x.u.empreendimento),geo=geoOf(x.u.empreendimento);
+  if(!geo||geo.lat==null){semGeo[k]=1;return}
+  var gr=grupos[k]=grupos[k]||{nome:x.u.empreendimento,geo:geo,itens:[],melhor:0,pos:i+1};
+  gr.itens.push(x);gr.melhor=Math.max(gr.melhor,x.pct)});
+ Object.keys(grupos).forEach(function(k){var gr=grupos[k],ll=[gr.geo.lat,gr.geo.lng];
+  var m=L.circleMarker(ll,{radius:gr.pos<=3?10:7,color:'#fff',weight:2,fillColor:gr.pos===1?'#D3141C':corNivel(gr.melhor),fillOpacity:1})
+   .addTo(MAP)
+   .bindTooltip(esc(gr.nome),{direction:'top',offset:[0,-8],className:'pin-tip'})
+   .bindPopup('<b>'+esc(gr.nome)+'</b>'+esc(gr.geo.end||'')+'<br>Até '+gr.melhor+'% compatível'+(gr.geo.prec==='bairro'?'<br><i>Localização aproximada pelo bairro.</i>':''));
+  m.on('click',function(){marcarLinhas(k,true)});
+  PINS[k]=m});
+ var ns=Object.keys(semGeo).length;
+ if(ns){g('mapnote').hidden=false;g('mapnote').textContent=(ns===1?'Um empreendimento da lista está':'Alguns empreendimentos da lista estão')+' sem endereço cadastrado e não aparecem no mapa.'}
+ setTimeout(function(){if(!MAP)return;MAP.invalidateSize();MAP.fitBounds(cidade,{padding:[16,16]})},60)}
+function marcarLinhas(k,rolar){var first=null;
+ g('result').querySelectorAll('.row').forEach(function(r){var on=r.getAttribute('data-emp')===k;r.classList.toggle('on',on);if(on&&!first)first=r});
+ if(rolar&&first)first.scrollIntoView({behavior:REDUCED?'auto':'smooth',block:'center'})}
+function focarPino(k){var m=PINS[k];marcarLinhas(k,false);if(!m||!MAP)return;
+ MAP.setView(m.getLatLng(),Math.max(MAP.getZoom(),14),{animate:!REDUCED});m.openPopup()}
+g('result').addEventListener('click',function(e){
+ var c=e.target.closest('.filtro button');if(c){FILTRO=c.getAttribute('data-f');renderResult();return}
+ var pc=e.target.closest('.pchip');if(pc){irPara(+pc.getAttribute('data-step'));return}
+ var r=e.target.closest('.row,.pick');if(r)focarPino(r.getAttribute('data-emp'))});
+g('result').addEventListener('keydown',function(e){var r=e.target.closest&&e.target.closest('.row');if(r&&(e.key==='Enter'||e.key===' ')){e.preventDefault();focarPino(r.getAttribute('data-emp'))}});
+
+function copiarLista(){var list=listaAtual();
+ var txt=list.map(function(x,i){var u=x.u;return (i+1)+'. '+u.empreendimento+', unidade '+u.unidade+', '+(u.tipologia||'—')+', '+(u.valor_tabela!=null?brl(u.valor_tabela):'—')+' ('+x.pct+'% compatível, '+x.fit[1].toLowerCase()+')'}).join('\n');
+ navigator.clipboard.writeText(txt).then(function(){alert('Lista copiada.')},function(){prompt('Copie a lista:',txt)})}
+
+/* registra o roteiro respondido em pesquisas_perfil (não bloqueia) */
+async function salvarPesquisa(){try{
+ var s=await sb.auth.getSession(),email=s.data.session&&s.data.session.user.email;if(!email)return;
+ var r=await sb.from('pesquisas_perfil').insert({criado_por:email,motivo:ANS.motivo||null,composicao:ANS.composicao||null,deslocamento:ANS.deslocamento||null,
+  tipologia:ANS.tipologia||null,prioridade:ANS.prioridade||null,lazer:ANS.lazer||[],diferenciais:ANS.diferenciais||[],regioes:ANS.regioes||[],
+  renda_total:PB?PB.renda:0,dependentes:!!(PB&&PB.dep),
+  recomendadas:TODAS.slice(0,15).map(function(x){return{empreendimento:x.u.empreendimento,unidade:x.u.unidade,tipologia:x.u.tipologia,pct:x.pct}})});
+ if(r.error)console.warn('pesquisa não salva',r.error)}catch(e){console.warn('pesquisa não salva',e)}}
+
+/* ===== auth (mesmo Supabase do Motor; sessão compartilhada no mesmo domínio) ===== */
+const SUPA_URL='https://ckpewmakzuypcoxshqii.supabase.co';
+const SUPA_KEY='sb_publishable_bFp3AujJ_nQQQYFzlw3A7Q_yqZHznMh'; // publishable — acesso controlado por RLS
+var sb=null;
+async function doLogin(ev){ev.preventDefault();var btn=g('gatebtn'),err=g('gateerr');err.textContent='';btn.disabled=true;btn.textContent='Entrando…';
+ try{var r=await sb.auth.signInWithPassword({email:g('em').value.trim(),password:g('pw').value});
+  if(r.error){err.textContent='E-mail ou senha incorretos. Confira e tente de novo.';return false}
+  g('gate').style.display='none';startQuiz()}
+ catch(e){err.textContent='Não foi possível conectar ao servidor. Verifique a internet e tente de novo.'}
+ finally{btn.disabled=false;btn.textContent='Entrar'}
+ return false}
+(async function init(){
+ var m=await import('https://esm.sh/@supabase/supabase-js@2?bundle');
+ sb=m.createClient(SUPA_URL,SUPA_KEY);
+ var s=await sb.auth.getSession();
+ if(s.data.session)startQuiz();else g('gate').style.display='flex'})();
+</script>
+</body>
+</html>
